@@ -183,7 +183,30 @@ function TeamTable({ teams }: { teams: EstimatedTeam[] }) {
               </td>
               <td>{team.predictedRank ?? "-"}</td>
               <td>
-                <strong>{team.players.map((player) => player.name).join(" / ") || team.displayName}</strong>
+                <strong>
+                  {team.players.length > 0 ? (
+                    <span className="player-links">
+                      {team.players.map((player, index) => (
+                        <span key={player.userId || `${team.id}-${player.name}`}>
+                          {index > 0 ? " / " : ""}
+                          {player.userId ? (
+                            <a
+                              href={`https://www.beachvolleybb.de/popup/beach/beachTeamMemberDetails.xhtml?userId=${player.userId}&hideHistoryBackButton=true`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {player.name}
+                            </a>
+                          ) : (
+                            player.name
+                          )}
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    team.displayName
+                  )}
+                </strong>
                 <span>{team.club}</span>
               </td>
               <td>{team.lvPoints}</td>
