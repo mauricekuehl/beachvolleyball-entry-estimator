@@ -1,0 +1,80 @@
+import { describe, expect, it } from "vitest";
+import { estimateAdmissions } from "../lib/estimator";
+import type { Player, RegisteredTeam, TournamentMetadata } from "../lib/types";
+
+function player(name: string, lv: number, dvv: number): Player {
+  return {
+    userId: name,
+    name,
+    dvvLicense: null,
+    lvRanking: { source: "LV", label: "BB | Erwachsene Männer", points: lv, place: null, date: "22.06.2026" },
+    dvvRanking: { source: "DVV", label: "DVV-Rangliste Männer", points: dvv, place: null, date: "22.06.2026" },
+  };
+}
+
+function team(id: string, lv: number, dvv: number, registeredAt = "23.06.2026, 20:12"): RegisteredTeam {
+  return {
+    id,
+    displayName: id,
+    club: "",
+    registeredAt,
+    notes: [],
+    players: [
+      player(`${id} A`, Math.floor(lv / 2), Math.floor(dvv / 2)),
+      player(`${id} B`, Math.ceil(lv / 2), Math.ceil(dvv / 2)),
+    ],
+  };
+}
+
+function tournament(category: TournamentMetadata["category"], automaticCapacity: number): TournamentMetadata {
+  return {
+    id: "1",
+    url: "https://www.beachvolleybb.de",
+    name: "Cup",
+    category,
+    categoryLabel: `BB | Kategorie ${category}`,
+    gender: "male",
+    date: "",
+    registrationCount: null,
+    mainDrawTeams: automaticCapacity,
+    qualificationTeams: 0,
+    wildcardMainDraw: 0,
+    automaticCapacity,
+    admissionDate: "",
+  };
+}
+
+describe("estimateAdmissions", () => {
+  it("uses A tournament DVV/LV quotas", () => {
+    const estimate = estimateAdmissions(tournament("A", 4), [
+      team("dvv-top", 10, 100),
+      team("lv-top", 90, 1),
+      team("lv-second", 80, 2),
+      team("lv-third", 70, 3),
+      team("outside", 1, 1),
+    ]);
+
+    expect(estimate.automatic.map((entry) => [entry.id, entry.sourceBucket])).toEqual([
+      ["dvv-top", "DVV"],
+      ["lv-top", "LV"],
+      ["lv-second", "LV"],
+      ["lv-third", "LV"],
+    ]);
+  });
+
+  it("uses inverse LV ranking for C tournaments", () => {
+    const estimate = estimateAdmissions(tournament("C", 2), [
+      team("high", 100, 0),
+      team("low", 1, 0),
+      team("mid", 50, 0),
+    ]);
+    expect(estimate.automatic.map((entry) => entry.id)).toEqual(["low", "mid"]);
+  });
+
+  it("separates unresolved teams", () => {
+    const unresolved: RegisteredTeam = { ...team("bad", 0, 0), players: [] };
+    const estimate = estimateAdmissions(tournament("B", 2), [team("good", 10, 0), unresolved]);
+    expect(estimate.unresolved.map((entry) => entry.id)).toEqual(["bad"]);
+    expect(estimate.automatic.map((entry) => entry.id)).toEqual(["good"]);
+  });
+});
