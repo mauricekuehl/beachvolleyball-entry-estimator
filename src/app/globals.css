@@ -66,13 +66,39 @@ h1 {
   letter-spacing: 0;
 }
 
+.mode-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.mode-actions button,
+.category-toggles button {
+  min-height: 44px;
+  border: 1px solid var(--foreground);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  font-weight: 700;
+  padding: 0 14px;
+}
+
+.mode-actions button.active,
+.category-toggles button.active {
+  background: var(--foreground);
+  color: #fff;
+}
+
 .url-form {
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 10px;
+  margin-bottom: 18px;
 }
 
-.url-form input {
+.url-form input,
+.email-row input {
   min-width: 0;
   height: 48px;
   border: 1px solid var(--line);
@@ -83,6 +109,7 @@ h1 {
 }
 
 .url-form button,
+.email-row button,
 .tabs button {
   border: 1px solid var(--foreground);
   border-radius: 6px;
@@ -92,12 +119,14 @@ h1 {
   font-weight: 700;
 }
 
-.url-form button {
+.url-form button,
+.email-row button {
   height: 48px;
   padding: 0 18px;
 }
 
-.url-form button:disabled {
+.url-form button:disabled,
+.email-row button:disabled {
   cursor: not-allowed;
   opacity: 0.55;
 }
@@ -128,6 +157,35 @@ h1 {
 .notice.error {
   border-color: #efb3b3;
   color: var(--red);
+}
+
+.notice.success {
+  border-color: #abd7bd;
+  color: var(--green);
+}
+
+.subscribe-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 16px;
+}
+
+.subscribe-form {
+  display: grid;
+  gap: 14px;
+}
+
+.category-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.email-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
 }
 
 .summary-grid {
@@ -267,18 +325,26 @@ td {
   color: var(--muted);
 }
 
+.contact-note {
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 @media (max-width: 900px) {
   .summary-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .url-form,
+  .email-row,
   .rule-panel {
     display: grid;
     grid-template-columns: 1fr;
   }
 
-  .url-form button {
+  .url-form button,
+  .email-row button {
     width: 100%;
   }
 

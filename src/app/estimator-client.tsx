@@ -1,21 +1,30 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import type { EstimateResponse, EstimatedTeam } from "@/lib/types";
+import type { EstimateResponse, EstimatedTeam, SubscriptionCategory } from "@/lib/types";
 
 type ApiError = {
   error: string;
   code: string;
 };
 
+type Mode = "estimate" | "subscribe";
 type TabId = "automatic" | "waitlist" | "all" | "unresolved";
+type SubscriptionStatus = { kind: "success" | "error"; message: string } | null;
+
+const CATEGORY_OPTIONS = ["Premium", "A+", "A", "B", "C"] as const satisfies readonly SubscriptionCategory[];
 
 export function EstimatorClient() {
+  const [mode, setMode] = useState<Mode>("estimate");
   const [url, setUrl] = useState("");
   const [result, setResult] = useState<EstimateResponse | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>("automatic");
+  const [email, setEmail] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState<SubscriptionCategory[]>([...CATEGORY_OPTIONS]);
+  const [subscriptionLoading, setSubscriptionLoading] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>(null);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -48,6 +57,47 @@ export function EstimatorClient() {
     }
   }
 
+  async function submitSubscription(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setSubscriptionLoading(true);
+    setSubscriptionStatus(null);
+
+    try {
+      const response = await fetch("/api/subscriptions", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, categories: selectedCategories }),
+      });
+      const payload = (await response.json()) as { ok?: boolean; error?: string };
+
+      if (!response.ok) {
+        setSubscriptionStatus({
+          kind: "error",
+          message: payload.error || "Could not save the subscription.",
+        });
+        return;
+      }
+
+      setSubscriptionStatus({
+        kind: "success",
+        message: "Subscription saved.",
+      });
+    } catch {
+      setSubscriptionStatus({
+        kind: "error",
+        message: "Could not reach the subscription API.",
+      });
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  }
+
+  function toggleCategory(category: SubscriptionCategory) {
+    setSelectedCategories((current) =>
+      current.includes(category) ? current.filter((item) => item !== category) : [...current, category],
+    );
+  }
+
   const visibleTeams = useMemo(() => {
     if (!result) return [];
     if (activeTab === "automatic") return result.automatic;
@@ -61,67 +111,128 @@ export function EstimatorClient() {
       <section className="intro">
         <div>
           <p className="eyebrow">Beach Tour Berlin-Brandenburg</p>
-          <h1>Entry estimator</h1>
+          <h1>Tournament tools</h1>
         </div>
-        <form className="url-form" onSubmit={submit}>
-          <input
-            aria-label="BeachvolleyBB tournament URL"
-            value={url}
-            onChange={(event) => setUrl(event.target.value)}
-            placeholder="https://www.beachvolleybb.de/cms/home/beachtour/erwachsene/turniere.xhtml?BeachTourneyComponent.tourneyId=..."
-          />
-          <button type="submit" disabled={loading || !url.trim()}>
-            {loading ? "Estimating" : "Estimate"}
+        <div className="mode-actions" aria-label="Choose tool">
+          <button
+            className={mode === "estimate" ? "active" : ""}
+            type="button"
+            aria-pressed={mode === "estimate"}
+            onClick={() => setMode("estimate")}
+          >
+            Estimate Zulassung
           </button>
-        </form>
+          <button
+            className={mode === "subscribe" ? "active" : ""}
+            type="button"
+            aria-pressed={mode === "subscribe"}
+            onClick={() => setMode("subscribe")}
+          >
+            Subscribe to new tournaments
+          </button>
+        </div>
       </section>
 
-      {error ? (
-        <section className="notice error">
-          <strong>{error.error}</strong>
-          <span>{error.code}</span>
-        </section>
-      ) : null}
-
-      {result ? (
+      {mode === "estimate" ? (
         <>
-          <section className="summary-grid" aria-label="Tournament summary">
-            <Metric label="Tournament" value={result.tournament.name} />
-            <Metric label="Category" value={result.tournament.categoryLabel || result.tournament.category} />
-            <Metric label="Date" value={result.tournament.date || "Unknown"} />
-            <Metric label="Automatic spots" value={String(result.tournament.automaticCapacity)} />
-            <Metric label="Wildcards" value={String(result.tournament.wildcardMainDraw)} />
-            <Metric label="Registrations" value={String(result.allTeams.length)} />
-          </section>
+          <form className="url-form" onSubmit={submit}>
+            <input
+              aria-label="BeachvolleyBB tournament URL"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              placeholder="https://www.beachvolleybb.de/cms/home/beachtour/erwachsene/turniere.xhtml?BeachTourneyComponent.tourneyId=..."
+            />
+            <button type="submit" disabled={loading || !url.trim()}>
+              {loading ? "Estimating" : "Estimate"}
+            </button>
+          </form>
 
-          <section className="rule-panel">
-            <strong>{result.ruleSummary}</strong>
-            <span>Fetched {new Date(result.dataSources.fetchedAt).toLocaleString()}</span>
-          </section>
+          {error ? (
+            <section className="notice error">
+              <strong>{error.error}</strong>
+              <span>{error.code}</span>
+            </section>
+          ) : null}
 
-          <section className="table-section">
-            <div className="tabs" role="tablist" aria-label="Estimate views">
-              <TabButton id="automatic" active={activeTab} count={result.automatic.length} onClick={setActiveTab}>
-                Automatic
-              </TabButton>
-              <TabButton id="waitlist" active={activeTab} count={result.waitlist.length} onClick={setActiveTab}>
-                Waitlist
-              </TabButton>
-              <TabButton id="all" active={activeTab} count={result.allTeams.length} onClick={setActiveTab}>
-                All
-              </TabButton>
-              <TabButton id="unresolved" active={activeTab} count={result.unresolved.length} onClick={setActiveTab}>
-                Unresolved
-              </TabButton>
-            </div>
-            <TeamTable teams={visibleTeams} />
-          </section>
+          {result ? (
+            <>
+              <section className="summary-grid" aria-label="Tournament summary">
+                <Metric label="Tournament" value={result.tournament.name} />
+                <Metric label="Category" value={result.tournament.categoryLabel || result.tournament.category} />
+                <Metric label="Date" value={result.tournament.date || "Unknown"} />
+                <Metric label="Automatic spots" value={String(result.tournament.automaticCapacity)} />
+                <Metric label="Wildcards" value={String(result.tournament.wildcardMainDraw)} />
+                <Metric label="Registrations" value={String(result.allTeams.length)} />
+              </section>
+
+              <section className="rule-panel">
+                <strong>{result.ruleSummary}</strong>
+                <span>Fetched {new Date(result.dataSources.fetchedAt).toLocaleString()}</span>
+              </section>
+
+              <section className="table-section">
+                <div className="tabs" role="tablist" aria-label="Estimate views">
+                  <TabButton id="automatic" active={activeTab} count={result.automatic.length} onClick={setActiveTab}>
+                    Automatic
+                  </TabButton>
+                  <TabButton id="waitlist" active={activeTab} count={result.waitlist.length} onClick={setActiveTab}>
+                    Waitlist
+                  </TabButton>
+                  <TabButton id="all" active={activeTab} count={result.allTeams.length} onClick={setActiveTab}>
+                    All
+                  </TabButton>
+                  <TabButton id="unresolved" active={activeTab} count={result.unresolved.length} onClick={setActiveTab}>
+                    Unresolved
+                  </TabButton>
+                </div>
+                <TeamTable teams={visibleTeams} />
+              </section>
+            </>
+          ) : (
+            <section className="empty-state">
+              Paste a public adult tournament link from beachvolleybb.de to estimate automatic entry from registrations.
+            </section>
+          )}
         </>
       ) : (
-        <section className="empty-state">
-          Paste a public adult tournament link from beachvolleybb.de to estimate automatic entry from registrations.
+        <section className="subscribe-panel">
+          <form className="subscribe-form" onSubmit={submitSubscription}>
+            <div className="category-toggles" aria-label="Tournament categories">
+              {CATEGORY_OPTIONS.map((category) => (
+                <button
+                  key={category}
+                  type="button"
+                  className={selectedCategories.includes(category) ? "active" : ""}
+                  aria-pressed={selectedCategories.includes(category)}
+                  onClick={() => toggleCategory(category)}
+                >
+                  {category}
+                </button>
+              ))}
+            </div>
+            <div className="email-row">
+              <input
+                aria-label="Email address"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@example.com"
+              />
+              <button type="submit" disabled={subscriptionLoading || !email.trim() || selectedCategories.length === 0}>
+                {subscriptionLoading ? "Saving" : "Subscribe"}
+              </button>
+            </div>
+          </form>
+
+          {subscriptionStatus ? (
+            <section className={`notice ${subscriptionStatus.kind}`}>
+              <strong>{subscriptionStatus.message}</strong>
+            </section>
+          ) : null}
         </section>
       )}
+
+      <footer className="contact-note">Contact: main@mauricekuehl.com</footer>
     </main>
   );
 }

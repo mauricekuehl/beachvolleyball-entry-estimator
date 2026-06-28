@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   isAdmissionPublished,
+  parsePublishedTournaments,
   parsePlayerDetails,
   parseRegistrations,
   parseTeamDetails,
@@ -83,5 +84,52 @@ describe("scraper parsers", () => {
     );
     expect(player.lvRanking?.points).toBe(397);
     expect(player.dvvRanking?.points).toBe(8);
+  });
+
+  it("parses published tournament overview rows", () => {
+    const tournaments = parsePublishedTournaments(`
+      <table id="samsBeachTourneyOverviewComponentTourneyTable">
+        <thead>
+          <tr>
+            <th>Kategorie</th>
+            <th>Turnier</th>
+            <th>Start / Meldeschluss</th>
+            <th>Ort</th>
+            <th>m/w</th>
+            <th>Teams</th>
+            <th>Anmeldung</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>BB | Kategorie A+</td>
+            <td>
+              <a href="/cms/home/beachtour/erwachsene/turniere.xhtml?BeachTourneyComponent.tourneyId=121408184">
+                Beachfreunde A+Cup(m)
+              </a>
+            </td>
+            <td>25.07.2026 / 14.07.2026</td>
+            <td>Berlin</td>
+            <td>m</td>
+            <td>12/24</td>
+            <td>offen</td>
+          </tr>
+        </tbody>
+      </table>`);
+
+    expect(tournaments).toEqual([
+      {
+        id: "121408184",
+        name: "Beachfreunde A+Cup(m)",
+        category: "A+",
+        categoryLabel: "BB | Kategorie A+",
+        url: "https://www.beachvolleybb.de/cms/home/beachtour/erwachsene/turniere.xhtml?BeachTourneyComponent.view=summary&BeachTourneyComponent.tourneyId=121408184#samsCmsComponent_49930769",
+        date: "25.07.2026 / 14.07.2026",
+        location: "Berlin",
+        gender: "m",
+        teams: "12/24",
+        registrationState: "offen",
+      },
+    ]);
   });
 });

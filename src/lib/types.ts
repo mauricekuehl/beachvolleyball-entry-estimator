@@ -1,4 +1,5 @@
 export type TournamentCategory = "Premium" | "A+" | "A" | "B" | "C" | "Unknown";
+export type SubscriptionCategory = Exclude<TournamentCategory, "Unknown">;
 export type TournamentGender = "male" | "female" | "mixed" | "unknown";
 export type RankingSource = "DVV" | "LV";
 export type TeamStatus = "automatic" | "waitlist" | "unresolved";
@@ -64,6 +65,19 @@ export type EstimateResponse = {
     registrationsUrl: string;
     admissionsUrl: string;
   };
+};
+
+export type PublishedTournament = {
+  id: string;
+  name: string;
+  category: TournamentCategory;
+  categoryLabel: string;
+  url: string;
+  date: string;
+  location: string;
+  gender: string;
+  teams: string;
+  registrationState: string;
 };
 
 export class EstimateError extends Error {

@@ -1,0 +1,90 @@
+import { getAppBaseUrl, requireEnv } from "./config";
+import type { PublishedTournament } from "./types";
+
+type SendTournamentEmailInput = {
+  email: string;
+  unsubscribeToken: string;
+  tournament: PublishedTournament;
+};
+
+export type EmailSendResult = {
+  ok: boolean;
+  status: number;
+  error?: string;
+};
+
+export async function sendNewTournamentEmail({
+  email,
+  unsubscribeToken,
+  tournament,
+}: SendTournamentEmailInput): Promise<EmailSendResult> {
+  const unsubscribeUrl = `${getAppBaseUrl()}/api/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}`;
+  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json",
+      "api-key": requireEnv("BREVO_API_KEY"),
+    },
+    body: JSON.stringify({
+      sender: {
+        email: requireEnv("BREVO_SENDER_EMAIL"),
+        name: process.env.BREVO_SENDER_NAME?.trim() || "Beachvolleyball Entry Estimator",
+      },
+      to: [{ email }],
+      subject: `New ${tournament.categoryLabel || tournament.category} tournament published`,
+      htmlContent: buildHtmlContent(tournament, unsubscribeUrl),
+      textContent: buildTextContent(tournament, unsubscribeUrl),
+    }),
+  });
+
+  if (response.ok) {
+    return { ok: true, status: response.status };
+  }
+
+  return {
+    ok: false,
+    status: response.status,
+    error: await response.text().catch(() => "Brevo request failed."),
+  };
+}
+
+function buildHtmlContent(tournament: PublishedTournament, unsubscribeUrl: string): string {
+  return `
+    <p>A new BeachvolleyBB tournament was published:</p>
+    <p>
+      <strong>${escapeHtml(tournament.name)}</strong><br>
+      ${escapeHtml(tournament.categoryLabel || tournament.category)}<br>
+      ${escapeHtml(tournament.date || "Date not listed")}<br>
+      ${escapeHtml(tournament.location || "Location not listed")}
+    </p>
+    <p><a href="${escapeHtml(tournament.url)}">Open tournament</a></p>
+    <p style="font-size:12px;color:#666">
+      <a href="${escapeHtml(unsubscribeUrl)}">Unsubscribe</a>
+    </p>
+  `;
+}
+
+function buildTextContent(tournament: PublishedTournament, unsubscribeUrl: string): string {
+  return [
+    "A new BeachvolleyBB tournament was published:",
+    "",
+    tournament.name,
+    tournament.categoryLabel || tournament.category,
+    tournament.date || "Date not listed",
+    tournament.location || "Location not listed",
+    "",
+    tournament.url,
+    "",
+    `Unsubscribe: ${unsubscribeUrl}`,
+  ].join("\n");
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}

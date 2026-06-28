@@ -2,6 +2,7 @@ import * as cheerio from "cheerio";
 import type {
   Player,
   PlayerRanking,
+  PublishedTournament,
   RegisteredTeam,
   TournamentCategory,
   TournamentGender,
@@ -11,6 +12,7 @@ import { EstimateError } from "./types";
 
 const BASE_URL = "https://www.beachvolleybb.de";
 const TOURNAMENT_PATH = "/cms/home/beachtour/erwachsene/turniere.xhtml";
+export const TOURNAMENT_OVERVIEW_URL = `${BASE_URL}${TOURNAMENT_PATH}`;
 const USER_AGENT =
   "beachvolleyball-entry-estimator/1.0 (+https://github.com/mauricekuehl/beachvolleyball-entry-estimator)";
 export const EXTERNAL_HTML_CACHE_TTL_MS = 15 * 60 * 1000;
@@ -89,6 +91,12 @@ export async function scrapeBeachvolleyBb(rawUrl: string, fetcher: Fetcher = fet
 
   const teams = await hydrateRegisteredTeams(registeredTeams, tournament.gender, cachedFetcher);
   return { tournament, teams };
+}
+
+export async function scrapePublishedTournaments(fetcher: Fetcher = fetchUncachedText): Promise<PublishedTournament[]> {
+  const cachedFetcher = createCachedFetcher(fetcher);
+  const html = await cachedFetcher(TOURNAMENT_OVERVIEW_URL);
+  return parsePublishedTournaments(html);
 }
 
 export function parseTournamentMetadata({
@@ -265,6 +273,55 @@ export function parseRankingRows(html: string): PlayerRanking[] {
   });
 
   return rankings;
+}
+
+export function parsePublishedTournaments(html: string): PublishedTournament[] {
+  const $ = cheerio.load(html);
+  const tournaments: PublishedTournament[] = [];
+
+  $("table").each((_, table) => {
+    const headers = $(table)
+      .find("thead th")
+      .map((__, th) => normalizeLabel($(th).text()))
+      .get();
+    const categoryIndex = headers.findIndex((header) => header === "kategorie");
+    const tournamentIndex = headers.findIndex((header) => header === "turnier");
+    const dateIndex = headers.findIndex((header) => header.includes("start"));
+    const locationIndex = headers.findIndex((header) => header === "ort");
+    const genderIndex = headers.findIndex((header) => header === "m/w");
+    const teamsIndex = headers.findIndex((header) => header === "teams");
+    const registrationIndex = headers.findIndex((header) => header === "anmeldung");
+    if (categoryIndex === -1 || tournamentIndex === -1) return;
+
+    $(table)
+      .find("tbody tr")
+      .each((__, row) => {
+        const cells = $(row).find("td");
+        const tournamentCell = cells.eq(tournamentIndex);
+        const tournamentLink = tournamentCell
+          .find("a[href*='BeachTourneyComponent.tourneyId=']")
+          .first();
+        const href = tournamentLink.attr("href") ?? "";
+        const id = href.match(/BeachTourneyComponent\.tourneyId=(\d+)/)?.[1];
+        if (!id) return;
+
+        const categoryLabel = normalizeWhitespace(cells.eq(categoryIndex).text());
+        tournaments.push({
+          id,
+          name: normalizeWhitespace(tournamentLink.text() || tournamentCell.text()),
+          category: parseCategory(categoryLabel),
+          categoryLabel,
+          url: buildTournamentUrl(id, "summary"),
+          date: dateIndex >= 0 ? normalizeWhitespace(cells.eq(dateIndex).text()) : "",
+          location: locationIndex >= 0 ? normalizeWhitespace(cells.eq(locationIndex).text()) : "",
+          gender: genderIndex >= 0 ? normalizeWhitespace(cells.eq(genderIndex).text()) : "",
+          teams: teamsIndex >= 0 ? normalizeWhitespace(cells.eq(teamsIndex).text()) : "",
+          registrationState: registrationIndex >= 0 ? normalizeWhitespace(cells.eq(registrationIndex).text()) : "",
+        });
+      });
+  });
+
+  return tournaments;
 }
 
 export function parseCategory(label: string): TournamentCategory {
