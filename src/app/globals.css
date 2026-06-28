@@ -171,6 +171,12 @@ h1 {
   padding: 16px;
 }
 
+.subscribe-copy {
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
 .subscribe-form {
   display: grid;
   gap: 14px;
