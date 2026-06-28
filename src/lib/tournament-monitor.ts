@@ -65,7 +65,7 @@ export async function checkForNewTournamentPublications(): Promise<TournamentMon
           emailsSent += 1;
           await logNotification(tournament.id, subscription.email, "sent");
         } else {
-          const error = result.error || `Brevo returned ${result.status}.`;
+          const error = result.error || `Resend returned ${result.status}.`;
           errors.push({ tournamentId: tournament.id, email: subscription.email, error });
           await logNotification(tournament.id, subscription.email, "failed", error);
         }

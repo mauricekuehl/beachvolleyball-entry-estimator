@@ -19,22 +19,23 @@ export async function sendNewTournamentEmail({
   tournament,
 }: SendTournamentEmailInput): Promise<EmailSendResult> {
   const unsubscribeUrl = `${getAppBaseUrl()}/api/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}`;
-  const response = await fetch("https://api.brevo.com/v3/smtp/email", {
+  const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
       "content-type": "application/json",
       accept: "application/json",
-      "api-key": requireEnv("BREVO_API_KEY"),
+      authorization: `Bearer ${requireEnv("RESEND_API_KEY")}`,
     },
     body: JSON.stringify({
-      sender: {
-        email: requireEnv("BREVO_SENDER_EMAIL"),
-        name: process.env.BREVO_SENDER_NAME?.trim() || "Beachvolleyball Entry Estimator",
-      },
-      to: [{ email }],
+      from: formatSender(),
+      to: [email],
       subject: `New ${tournament.categoryLabel || tournament.category} tournament published`,
-      htmlContent: buildHtmlContent(tournament, unsubscribeUrl),
-      textContent: buildTextContent(tournament, unsubscribeUrl),
+      html: buildHtmlContent(tournament, unsubscribeUrl),
+      text: buildTextContent(tournament, unsubscribeUrl),
+      headers: {
+        "List-Unsubscribe": `<${unsubscribeUrl}>`,
+        "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
+      },
     }),
   });
 
@@ -45,8 +46,14 @@ export async function sendNewTournamentEmail({
   return {
     ok: false,
     status: response.status,
-    error: await response.text().catch(() => "Brevo request failed."),
+    error: await response.text().catch(() => "Resend request failed."),
   };
+}
+
+function formatSender(): string {
+  const fromEmail = requireEnv("RESEND_FROM_EMAIL");
+  const fromName = process.env.RESEND_FROM_NAME?.trim() || "Beachvolleyball Entry Estimator";
+  return `${fromName} <${fromEmail}>`;
 }
 
 function buildHtmlContent(tournament: PublishedTournament, unsubscribeUrl: string): string {

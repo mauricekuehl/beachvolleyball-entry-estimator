@@ -8,16 +8,17 @@ const vercelEnvironment = process.env.VERCEL_ENVIRONMENT || "production";
 const vercelKeys = [
   "TURSO_DATABASE_URL",
   "TURSO_AUTH_TOKEN",
-  "BREVO_API_KEY",
-  "BREVO_SENDER_EMAIL",
-  "BREVO_SENDER_NAME",
+  "RESEND_API_KEY",
+  "RESEND_FROM_EMAIL",
+  "RESEND_FROM_NAME",
   "APP_BASE_URL",
   "CRON_SECRET",
 ];
 const githubKeys = ["APP_BASE_URL", "CRON_SECRET"];
+const optionalVercelKeys = new Set(["RESEND_FROM_NAME"]);
 
 const values = parseDotenv(readFileSync(envFile, "utf8"));
-const missing = vercelKeys.filter((key) => !values[key]);
+const missing = vercelKeys.filter((key) => !optionalVercelKeys.has(key) && !values[key]);
 
 if (missing.length > 0) {
   console.error(`Missing required values in ${envFile}: ${missing.join(", ")}`);
@@ -25,6 +26,8 @@ if (missing.length > 0) {
 }
 
 for (const key of vercelKeys) {
+  if (!values[key]) continue;
+
   run(
     "npx",
     ["vercel@latest", "env", "add", key, vercelEnvironment, "--force", "--sensitive", "--yes"],
