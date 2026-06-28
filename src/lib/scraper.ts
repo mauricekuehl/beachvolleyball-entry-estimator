@@ -13,9 +13,17 @@ const BASE_URL = "https://www.beachvolleybb.de";
 const TOURNAMENT_PATH = "/cms/home/beachtour/erwachsene/turniere.xhtml";
 const USER_AGENT =
   "beachvolleyball-entry-estimator/1.0 (+https://github.com/mauricekuehl/beachvolleyball-entry-estimator)";
+export const EXTERNAL_HTML_CACHE_TTL_MS = 15 * 60 * 1000;
 
 type ViewName = "summary" | "details" | "registrations" | "admissions";
 type Fetcher = (url: string) => Promise<string>;
+type CacheEntry = {
+  expiresAt: number;
+  html?: string;
+  pending?: Promise<string>;
+};
+
+const externalHtmlCache = new Map<string, CacheEntry>();
 
 export function parseTournamentUrl(rawUrl: string): { id: string; normalizedUrl: string } {
   let parsed: URL;
@@ -49,13 +57,14 @@ export function buildTournamentUrl(id: string, view: ViewName): string {
   return `${url.toString()}#samsCmsComponent_49930769`;
 }
 
-export async function scrapeBeachvolleyBb(rawUrl: string, fetcher: Fetcher = fetchText) {
+export async function scrapeBeachvolleyBb(rawUrl: string, fetcher: Fetcher = fetchUncachedText) {
+  const cachedFetcher = createCachedFetcher(fetcher);
   const { id, normalizedUrl } = parseTournamentUrl(rawUrl);
   const [summaryHtml, detailsHtml, admissionsHtml, registrationsHtml] = await Promise.all([
-    fetcher(buildTournamentUrl(id, "summary")),
-    fetcher(buildTournamentUrl(id, "details")),
-    fetcher(buildTournamentUrl(id, "admissions")),
-    fetcher(buildTournamentUrl(id, "registrations")),
+    cachedFetcher(buildTournamentUrl(id, "summary")),
+    cachedFetcher(buildTournamentUrl(id, "details")),
+    cachedFetcher(buildTournamentUrl(id, "admissions")),
+    cachedFetcher(buildTournamentUrl(id, "registrations")),
   ]);
 
   if (isAdmissionPublished(admissionsHtml)) {
@@ -78,7 +87,7 @@ export async function scrapeBeachvolleyBb(rawUrl: string, fetcher: Fetcher = fet
     throw new EstimateError("No public registrations were found for this tournament.", 404, "NO_REGISTRATIONS");
   }
 
-  const teams = await hydrateRegisteredTeams(registeredTeams, tournament.gender, fetcher);
+  const teams = await hydrateRegisteredTeams(registeredTeams, tournament.gender, cachedFetcher);
   return { tournament, teams };
 }
 
@@ -284,6 +293,13 @@ export function playerDetailUrl(userId: string): string {
   return `${BASE_URL}/popup/beach/beachTeamMemberDetails.xhtml?userId=${userId}&hideHistoryBackButton=true`;
 }
 
+export function clearExternalHtmlCacheForTests(): void {
+  if (process.env.NODE_ENV !== "test") {
+    throw new Error("clearExternalHtmlCacheForTests can only be used in tests.");
+  }
+  externalHtmlCache.clear();
+}
+
 async function hydrateRegisteredTeams(
   teams: RegisteredTeam[],
   gender: TournamentGender,
@@ -316,7 +332,36 @@ async function hydrateRegisteredTeams(
   );
 }
 
-async function fetchText(url: string): Promise<string> {
+function createCachedFetcher(fetcher: Fetcher): Fetcher {
+  return async function fetchCachedText(url: string): Promise<string> {
+    const now = Date.now();
+    const cached = externalHtmlCache.get(url);
+    if (cached && cached.expiresAt > now) {
+      if (cached.html != null) return cached.html;
+      if (cached.pending) return cached.pending;
+    }
+
+    const pending = fetcher(url);
+    externalHtmlCache.set(url, {
+      expiresAt: now + EXTERNAL_HTML_CACHE_TTL_MS,
+      pending,
+    });
+
+    try {
+      const html = await pending;
+      externalHtmlCache.set(url, {
+        expiresAt: Date.now() + EXTERNAL_HTML_CACHE_TTL_MS,
+        html,
+      });
+      return html;
+    } catch (error) {
+      externalHtmlCache.delete(url);
+      throw error;
+    }
+  };
+}
+
+async function fetchUncachedText(url: string): Promise<string> {
   const response = await fetch(url, {
     headers: {
       "user-agent": USER_AGENT,
