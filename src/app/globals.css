@@ -1,13 +1,15 @@
 :root {
-  --background: #f6f7f2;
-  --foreground: #171a1f;
-  --muted: #68707d;
-  --line: #d9ded4;
-  --panel: #ffffff;
-  --green: #276749;
-  --blue: #2159a6;
-  --red: #a92d2d;
-  --amber: #8a5a00;
+  --background: #101214;
+  --foreground: #f3f5f7;
+  --muted: #9aa3ad;
+  --line: #2b3138;
+  --panel: #181c20;
+  --panel-strong: #20262c;
+  --field: #0f1215;
+  --green: #78d59e;
+  --blue: #8bb8ff;
+  --red: #ff8f8f;
+  --amber: #ffd37a;
 }
 
 html {
@@ -23,7 +25,9 @@ body {
 body {
   min-height: 100%;
   color: var(--foreground);
-  background: var(--background);
+  background:
+    radial-gradient(circle at 20% 0%, rgba(120, 213, 158, 0.08), transparent 30%),
+    var(--background);
   font-family: Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -77,17 +81,21 @@ h1 {
   height: 48px;
   border: 1px solid var(--line);
   border-radius: 6px;
-  background: #fff;
+  background: var(--field);
   padding: 0 14px;
   color: var(--foreground);
 }
 
+.url-form input::placeholder {
+  color: #69737f;
+}
+
 .url-form button,
 .tabs button {
-  border: 1px solid var(--foreground);
+  border: 1px solid #35404a;
   border-radius: 6px;
-  background: var(--foreground);
-  color: #fff;
+  background: #edf3f7;
+  color: #111417;
   cursor: pointer;
   font-weight: 700;
 }
@@ -126,7 +134,8 @@ h1 {
 }
 
 .notice.error {
-  border-color: #efb3b3;
+  border-color: rgba(255, 143, 143, 0.45);
+  background: rgba(255, 143, 143, 0.08);
   color: var(--red);
 }
 
@@ -173,7 +182,7 @@ td span {
   gap: 8px;
   border-bottom: 1px solid var(--line);
   padding: 10px;
-  background: #fdfdfb;
+  background: var(--panel-strong);
 }
 
 .tabs button {
@@ -183,8 +192,8 @@ td span {
 }
 
 .tabs button.active {
-  background: var(--foreground);
-  color: #fff;
+  background: #edf3f7;
+  color: #111417;
 }
 
 .tabs span {
@@ -212,7 +221,7 @@ td {
 }
 
 th {
-  background: #f3f5ef;
+  background: var(--panel-strong);
   color: var(--muted);
   font-size: 12px;
   text-transform: uppercase;
@@ -231,17 +240,17 @@ td {
 }
 
 .status.automatic {
-  background: #dff3e8;
+  background: rgba(120, 213, 158, 0.14);
   color: var(--green);
 }
 
 .status.waitlist {
-  background: #e6eef9;
+  background: rgba(139, 184, 255, 0.14);
   color: var(--blue);
 }
 
 .status.unresolved {
-  background: #fff1d5;
+  background: rgba(255, 211, 122, 0.14);
   color: var(--amber);
 }
 
