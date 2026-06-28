@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "sync-env": "node scripts/sync-env.mjs"
   },
   "dependencies": {
     "@libsql/client": "^0.17.4",
