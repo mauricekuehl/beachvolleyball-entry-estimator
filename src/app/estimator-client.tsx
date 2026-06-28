@@ -98,10 +98,6 @@ export function EstimatorClient() {
     );
   }
 
-  function toggleAllCategories() {
-    setSelectedCategories((current) => (current.length === CATEGORY_OPTIONS.length ? [] : [...CATEGORY_OPTIONS]));
-  }
-
   const visibleTeams = useMemo(() => {
     if (!result) return [];
     if (activeTab === "automatic") return result.automatic;
@@ -204,24 +200,19 @@ export function EstimatorClient() {
             Sends an email when new tournaments are published in the selected categories.
           </p>
           <form className="subscribe-form" onSubmit={submitSubscription}>
-            <div className="category-toggles" aria-label="Tournament categories">
-              <button
-                type="button"
-                className={selectedCategories.length === CATEGORY_OPTIONS.length ? "active" : ""}
-                aria-pressed={selectedCategories.length === CATEGORY_OPTIONS.length}
-                onClick={toggleAllCategories}
-              >
-                All tournaments
-              </button>
+            <div className="category-list" aria-label="Tournament categories">
               {CATEGORY_OPTIONS.map((category) => (
                 <button
                   key={category}
                   type="button"
-                  className={selectedCategories.includes(category) ? "active" : ""}
+                  className={`category-row ${selectedCategories.includes(category) ? "active" : ""}`}
                   aria-pressed={selectedCategories.includes(category)}
                   onClick={() => toggleCategory(category)}
                 >
-                  {category}
+                  <span>{category}</span>
+                  <span className="toggle-switch" aria-hidden="true">
+                    <span />
+                  </span>
                 </button>
               ))}
             </div>

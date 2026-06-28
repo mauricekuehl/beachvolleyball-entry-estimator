@@ -72,8 +72,7 @@ h1 {
   gap: 10px;
 }
 
-.mode-actions button,
-.category-toggles button {
+.mode-actions button {
   min-height: 44px;
   border: 1px solid var(--foreground);
   border-radius: 6px;
@@ -84,8 +83,7 @@ h1 {
   padding: 0 14px;
 }
 
-.mode-actions button.active,
-.category-toggles button.active {
+.mode-actions button.active {
   background: var(--foreground);
   color: #fff;
 }
@@ -182,10 +180,62 @@ h1 {
   gap: 14px;
 }
 
-.category-toggles {
-  display: flex;
-  flex-wrap: wrap;
+.category-list {
+  display: grid;
   gap: 8px;
+}
+
+.category-row {
+  width: 100%;
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--foreground);
+  cursor: pointer;
+  font-weight: 700;
+  padding: 10px 12px 10px 14px;
+  text-align: left;
+}
+
+.category-row.active {
+  border-color: var(--foreground);
+}
+
+.toggle-switch {
+  position: relative;
+  flex: 0 0 auto;
+  width: 54px;
+  height: 30px;
+  border: 2px solid var(--foreground);
+  border-radius: 999px;
+  background: #fff;
+}
+
+.toggle-switch span {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--foreground);
+  transition:
+    transform 140ms ease,
+    background 140ms ease;
+}
+
+.category-row.active .toggle-switch {
+  background: var(--foreground);
+}
+
+.category-row.active .toggle-switch span {
+  background: #fff;
+  transform: translateX(24px);
 }
 
 .email-row {
