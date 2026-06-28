@@ -69,7 +69,7 @@ export async function scrapeBeachvolleyBb(rawUrl: string, fetcher: Fetcher = fet
 
   if (isAdmissionPublished(admissionsHtml)) {
     throw new EstimateError(
-      "You dumb idiot, the Zulassungsliste is already publicly available.",
+      "The Zulassungsliste is already publicly available.",
       409,
       "ADMISSIONS_ALREADY_PUBLIC",
     );
