@@ -120,7 +120,7 @@ function toEstimatedTeam(team: RegisteredTeam): EstimatedTeam {
     if (!player.dvvRanking) notes.push(`${player.name}: no matching DVV ranking found.`);
   }
 
-  const unresolved = team.players.length !== 2 || team.players.some((player) => !player.lvRanking);
+  const unresolved = team.players.length !== 2;
 
   return {
     ...team,

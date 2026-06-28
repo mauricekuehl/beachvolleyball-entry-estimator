@@ -26,6 +26,23 @@ function team(id: string, lv: number, dvv: number, registeredAt = "23.06.2026, 2
   };
 }
 
+function partiallyRankedTeam(id: string): RegisteredTeam {
+  return {
+    ...team(id, 0, 0),
+    players: [
+      {
+        ...player(`${id} A`, 17, 0),
+        dvvRanking: null,
+      },
+      {
+        ...player(`${id} B`, 0, 0),
+        lvRanking: null,
+        dvvRanking: null,
+      },
+    ],
+  };
+}
+
 function tournament(category: TournamentMetadata["category"], automaticCapacity: number): TournamentMetadata {
   return {
     id: "1",
@@ -76,5 +93,14 @@ describe("estimateAdmissions", () => {
     const estimate = estimateAdmissions(tournament("B", 2), [team("good", 10, 0), unresolved]);
     expect(estimate.unresolved.map((entry) => entry.id)).toEqual(["bad"]);
     expect(estimate.automatic.map((entry) => entry.id)).toEqual(["good"]);
+  });
+
+  it("keeps resolved teams rankable when ranking rows are missing", () => {
+    const estimate = estimateAdmissions(tournament("B", 2), [partiallyRankedTeam("partial"), team("full", 10, 0)]);
+
+    expect(estimate.unresolved).toEqual([]);
+    expect(estimate.automatic.map((entry) => entry.id)).toEqual(["partial", "full"]);
+    expect(estimate.automatic[0].notes).toContain("partial A: no matching DVV ranking found.");
+    expect(estimate.automatic[0].notes).toContain("partial B: no matching BB ranking found.");
   });
 });
