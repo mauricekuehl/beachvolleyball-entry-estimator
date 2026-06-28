@@ -2,7 +2,7 @@
 
 Estimate BeachvolleyBB tournament admissions from public registrations.
 
-Live: https://beachvolleyball-tournament-entry-es.vercel.app
+Live: https://beachvolleyball-entry-estimator.vercel.app
 
 ## Local
 
