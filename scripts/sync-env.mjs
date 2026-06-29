@@ -2,7 +2,6 @@ import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 
 const envFile = process.argv[2] ?? ".env.prod";
-const repo = process.env.GITHUB_REPOSITORY || "mauricekuehl/beachvolleyball-entry-estimator";
 const vercelEnvironment = process.env.VERCEL_ENVIRONMENT || "production";
 
 const vercelKeys = [
@@ -14,7 +13,6 @@ const vercelKeys = [
   "APP_BASE_URL",
   "CRON_SECRET",
 ];
-const githubKeys = ["APP_BASE_URL", "CRON_SECRET"];
 const optionalVercelKeys = new Set(["RESEND_FROM_NAME"]);
 
 const values = parseDotenv(readFileSync(envFile, "utf8"));
@@ -34,11 +32,6 @@ for (const key of vercelKeys) {
     values[key],
   );
   console.log(`Synced Vercel ${vercelEnvironment} env: ${key}`);
-}
-
-for (const key of githubKeys) {
-  run("gh", ["secret", "set", key, "--repo", repo, "--app", "actions"], values[key]);
-  console.log(`Synced GitHub Actions secret: ${key}`);
 }
 
 console.log("Done. Redeploy Vercel for updated production runtime variables to take effect.");
