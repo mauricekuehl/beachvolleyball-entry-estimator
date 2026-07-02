@@ -22,6 +22,7 @@ export type TournamentMetadata = {
 
 export type PlayerRanking = {
   source: RankingSource;
+  season: number;
   label: string;
   points: number;
   place: number | null;

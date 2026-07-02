@@ -3,6 +3,7 @@ import {
   isAdmissionPublished,
   parsePublishedTournaments,
   parsePlayerDetails,
+  parseRankingRows,
   parseRegistrations,
   parseTeamDetails,
   parseTournamentMetadata,
@@ -84,6 +85,56 @@ describe("scraper parsers", () => {
     );
     expect(player.lvRanking?.points).toBe(397);
     expect(player.dvvRanking?.points).toBe(8);
+  });
+
+  it("only parses ranking rows from the ranking places section", () => {
+    const rankings = parseRankingRows(`
+      <div class="samsContentBox">
+        <div class="samsContentBoxHeader">Ranglistenplätze</div>
+        <div class="samsContentBoxContent">
+          <table><tbody>
+            <tr><td>2026</td><td>DVV-Rangliste Männer</td><td>29.06.2026</td><td>532</td><td>4</td></tr>
+            <tr><td>2026</td><td>BB | Erwachsene Männer</td><td>29.06.2026</td><td>31</td><td>327</td></tr>
+          </tbody></table>
+        </div>
+      </div>
+      <div class="samsContentBox">
+        <div class="samsContentBoxHeader">Turnierpunkte</div>
+        <div class="samsContentBoxContent">
+          <table><tbody>
+            <tr><td>2026</td><td>BB | Erwachsene Männer</td><td>Vorsaisonpunkte</td><td>Vorsaison</td><td>36</td></tr>
+          </tbody></table>
+        </div>
+      </div>`);
+
+    expect(rankings.map((ranking) => [ranking.label, ranking.points])).toEqual([
+      ["DVV-Rangliste Männer", 4],
+      ["BB | Erwachsene Männer", 327],
+    ]);
+  });
+
+  it("prefers the tournament season over higher historical DVV points", () => {
+    const player = parsePlayerDetails(
+      `
+      <h2>Ollech, Robert</h2>
+      <div class="samsContentBox">
+        <div class="samsContentBoxHeader">Ranglistenplätze</div>
+        <div class="samsContentBoxContent">
+          <table><tbody>
+            <tr><td>2024</td><td>DVV-Rangliste Männer</td><td>29.06.2026</td><td>441</td><td>6</td></tr>
+            <tr><td>2026</td><td>HVbV | Rangliste Männer (DVV)</td><td>29.06.2026</td><td>532</td><td>4</td></tr>
+            <tr><td>2026</td><td>DVV-Rangliste Männer</td><td>29.06.2026</td><td>532</td><td>4</td></tr>
+            <tr><td>2026</td><td>BB | Erwachsene Männer</td><td>29.06.2026</td><td>31</td><td>327</td></tr>
+          </tbody></table>
+        </div>
+      </div>`,
+      "male",
+      2026,
+    );
+
+    expect(player.dvvRanking?.season).toBe(2026);
+    expect(player.dvvRanking?.points).toBe(4);
+    expect(player.lvRanking?.points).toBe(327);
   });
 
   it("parses published tournament overview rows", () => {

@@ -7,8 +7,8 @@ function player(name: string, lv: number, dvv: number): Player {
     userId: name,
     name,
     dvvLicense: null,
-    lvRanking: { source: "LV", label: "BB | Erwachsene Männer", points: lv, place: null, date: "22.06.2026" },
-    dvvRanking: { source: "DVV", label: "DVV-Rangliste Männer", points: dvv, place: null, date: "22.06.2026" },
+    lvRanking: { source: "LV", season: 2026, label: "BB | Erwachsene Männer", points: lv, place: null, date: "22.06.2026" },
+    dvvRanking: { source: "DVV", season: 2026, label: "DVV-Rangliste Männer", points: dvv, place: null, date: "22.06.2026" },
   };
 }
 

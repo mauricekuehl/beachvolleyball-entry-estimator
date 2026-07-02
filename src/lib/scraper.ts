@@ -3,6 +3,7 @@ import type {
   Player,
   PlayerRanking,
   PublishedTournament,
+  RankingSource,
   RegisteredTeam,
   TournamentCategory,
   TournamentGender,
@@ -89,7 +90,7 @@ export async function scrapeBeachvolleyBb(rawUrl: string, fetcher: Fetcher = fet
     throw new EstimateError("No public registrations were found for this tournament.", 404, "NO_REGISTRATIONS");
   }
 
-  const teams = await hydrateRegisteredTeams(registeredTeams, tournament.gender, cachedFetcher);
+  const teams = await hydrateRegisteredTeams(registeredTeams, tournament, cachedFetcher);
   return { tournament, teams };
 }
 
@@ -233,7 +234,7 @@ export function parseTeamDetails(html: string): Pick<RegisteredTeam, "players" |
   };
 }
 
-export function parsePlayerDetails(html: string, gender: TournamentGender): Player {
+export function parsePlayerDetails(html: string, gender: TournamentGender, preferredSeason?: number): Player {
   const $ = cheerio.load(html);
   const titleName = normalizeWhitespace($("h2").first().text() || $("title").first().text());
   const rankings = parseRankingRows(html);
@@ -243,32 +244,39 @@ export function parsePlayerDetails(html: string, gender: TournamentGender): Play
     userId: "",
     name: titleName || "Unknown player",
     dvvLicense: extractDvvLicense($),
-    lvRanking: pickBestRanking(rankings, "LV", genderLabel),
-    dvvRanking: pickBestRanking(rankings, "DVV", genderLabel),
+    lvRanking: pickBestRanking(rankings, "LV", genderLabel, preferredSeason),
+    dvvRanking: pickBestRanking(rankings, "DVV", genderLabel, preferredSeason),
   };
 }
 
 export function parseRankingRows(html: string): PlayerRanking[] {
   const $ = cheerio.load(html);
   const rankings: PlayerRanking[] = [];
+  const rankingTables = $(".samsContentBox")
+    .filter((_, box) => normalizeLabel($(box).find(".samsContentBoxHeader").first().text()) === "ranglistenplätze")
+    .find("table");
+  const tables = rankingTables.length > 0 ? rankingTables : $("table");
 
-  $("tbody tr").each((_, row) => {
+  tables.find("tbody tr").each((_, row) => {
     const cells = $(row)
       .find("td")
       .map((__, cell) => normalizeWhitespace($(cell).text()))
       .get();
     if (cells.length !== 5 || !/^\d{4}$/.test(cells[0])) return;
 
+    const season = parseInteger(cells[0]);
     const label = cells[1];
+    const date = cells[2];
     const points = parseInteger(cells[4]);
-    if (points == null) return;
+    if (!season || !/^\d{2}\.\d{2}\.\d{4}$/.test(date) || points == null) return;
 
     rankings.push({
-      source: label.toLowerCase().includes("dvv-rangliste") ? "DVV" : "LV",
+      source: isDvvRankingLabel(label) ? "DVV" : "LV",
+      season,
       label,
       points,
       place: parseInteger(cells[3]),
-      date: cells[2],
+      date,
     });
   });
 
@@ -359,9 +367,11 @@ export function clearExternalHtmlCacheForTests(): void {
 
 async function hydrateRegisteredTeams(
   teams: RegisteredTeam[],
-  gender: TournamentGender,
+  tournament: TournamentMetadata,
   fetcher: Fetcher,
 ): Promise<RegisteredTeam[]> {
+  const preferredSeason = parseSeason(tournament.date);
+
   return Promise.all(
     teams.map(async (team) => {
       const teamDetails = await fetcher(teamDetailUrl(team.id))
@@ -371,7 +381,7 @@ async function hydrateRegisteredTeams(
       const players = await Promise.all(
         teamDetails.players.map(async (player) => {
           const parsed = await fetcher(playerDetailUrl(player.userId))
-            .then((html) => parsePlayerDetails(html, gender))
+            .then((html) => parsePlayerDetails(html, tournament.gender, preferredSeason))
             .catch(() => null);
 
           return parsed
@@ -431,7 +441,102 @@ async function fetchUncachedText(url: string): Promise<string> {
     throw new EstimateError(`BeachvolleyBB returned ${response.status} for ${url}.`, 502, "UPSTREAM_FETCH");
   }
 
+  const html = await response.text();
+  if (!url.includes("/popup/beach/beachTeamMemberDetails.xhtml")) {
+    return html;
+  }
+
+  return appendPaginatedRankingRows(url, html, response.headers);
+}
+
+async function appendPaginatedRankingRows(url: string, html: string, headers: Headers): Promise<string> {
+  const $ = cheerio.load(html);
+  const rankingBox = $(".samsContentBox").filter(
+    (_, box) => normalizeLabel($(box).find(".samsContentBoxHeader").first().text()) === "ranglistenplätze",
+  );
+  const tableWidget = rankingBox.find(".ui-datatable").first();
+  const tableId = tableWidget.attr("id");
+  const current = normalizeWhitespace(tableWidget.find(".ui-paginator-current").first().text());
+  const [, pageSizeText, totalText] = current.match(/Daten\s+1-(\d+)\/(\d+)/) ?? [];
+  const pageSize = parseInteger(pageSizeText);
+  const total = parseInteger(totalText);
+  const viewState = $("input[name='jakarta.faces.ViewState']").attr("value");
+  const cookieHeader = cookieHeaderFrom(headers);
+
+  if (!tableId || !viewState || !cookieHeader || !pageSize || !total || total <= pageSize) {
+    return html;
+  }
+
+  let nextViewState = viewState;
+  const tbody = $(`[id="${tableId}_data"]`);
+
+  for (let first = pageSize; first < total; first += pageSize) {
+    const pageHtml = await fetchPrimeFacesDataTablePage(url, tableId, first, pageSize, nextViewState, cookieHeader);
+    const page = cheerio.load(pageHtml, { xmlMode: true });
+    const update = page(`update[id="${tableId}"]`).text();
+    const updatedViewState = page("update[id$='jakarta.faces.ViewState:0']").text();
+    if (update) {
+      tbody.append(update);
+    }
+    if (updatedViewState) {
+      nextViewState = updatedViewState;
+    }
+  }
+
+  return $.html();
+}
+
+async function fetchPrimeFacesDataTablePage(
+  url: string,
+  tableId: string,
+  first: number,
+  rows: number,
+  viewState: string,
+  cookieHeader: string,
+): Promise<string> {
+  const body = new URLSearchParams({
+    "jakarta.faces.partial.ajax": "true",
+    "jakarta.faces.source": tableId,
+    "jakarta.faces.partial.execute": tableId,
+    "jakarta.faces.partial.render": tableId,
+    teamMemberDetailForm: "teamMemberDetailForm",
+    [tableId]: tableId,
+    [`${tableId}_pagination`]: "true",
+    [`${tableId}_first`]: String(first),
+    [`${tableId}_rows`]: String(rows),
+    [`${tableId}_skipChildren`]: "true",
+    [`${tableId}_encodeFeature`]: "true",
+    "jakarta.faces.ViewState": viewState,
+  });
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      "user-agent": USER_AGENT,
+      accept: "application/xml, text/xml, */*; q=0.01",
+      "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
+      "faces-request": "partial/ajax",
+      "x-requested-with": "XMLHttpRequest",
+      cookie: cookieHeader,
+    },
+    body,
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    throw new EstimateError(`BeachvolleyBB returned ${response.status} for ${url}.`, 502, "UPSTREAM_FETCH");
+  }
+
   return response.text();
+}
+
+function cookieHeaderFrom(headers: Headers): string {
+  const getSetCookie = (headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
+  const setCookies = typeof getSetCookie === "function" ? getSetCookie.call(headers) : [headers.get("set-cookie") ?? ""];
+  return setCookies
+    .filter(Boolean)
+    .map((cookie) => cookie.split(";")[0])
+    .join("; ");
 }
 
 function parseKeyValueTable(html: string): Map<string, string> {
@@ -455,8 +560,9 @@ function pickBestRanking(
   rankings: PlayerRanking[],
   source: "DVV" | "LV",
   genderLabel: string,
+  preferredSeason?: number,
 ): PlayerRanking | null {
-  const candidates = rankings.filter((ranking) => {
+  let candidates = rankings.filter((ranking) => {
     const label = ranking.label.toLowerCase();
     if (source === "DVV") {
       return ranking.source === "DVV" && label.includes(genderLabel);
@@ -464,13 +570,42 @@ function pickBestRanking(
     return label.includes("bb | erwachsene") && label.includes(genderLabel);
   });
 
-  return candidates.sort((a, b) => b.points - a.points)[0] ?? null;
+  const season = preferredSeason ?? Math.max(...candidates.map((ranking) => ranking.season));
+  if (Number.isFinite(season)) {
+    candidates = candidates.filter((ranking) => ranking.season === season);
+  }
+
+  return candidates
+    .sort((a, b) => {
+      const pointDiff = b.points - a.points;
+      if (pointDiff !== 0) return pointDiff;
+      return rankingLabelPriority(a.label, source) - rankingLabelPriority(b.label, source);
+    })[0] ?? null;
 }
 
 function rankingGenderLabel(gender: TournamentGender): string {
   if (gender === "female") return "frauen";
   if (gender === "mixed") return "mixed";
   return "männer";
+}
+
+function isDvvRankingLabel(label: string): boolean {
+  const normalized = label.toLowerCase();
+  return normalized.includes("dvv-rangliste") || normalized.includes("(dvv)");
+}
+
+function rankingLabelPriority(label: string, source: RankingSource): number {
+  const normalized = label.toLowerCase();
+  if (source === "DVV" && normalized.includes("dvv-rangliste")) return 0;
+  if (source === "LV" && normalized.includes("bb | erwachsene")) return 0;
+  return 1;
+}
+
+function parseSeason(value: string): number | undefined {
+  const match = value.match(/\b(20\d{2})\b/);
+  if (!match) return undefined;
+  const season = Number(match[1]);
+  return Number.isFinite(season) ? season : undefined;
 }
 
 function titleFromHtml(html: string): string | null {
