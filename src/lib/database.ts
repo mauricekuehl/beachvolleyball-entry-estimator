@@ -24,6 +24,7 @@ async function ensureSchema(db: Client): Promise<void> {
         id TEXT PRIMARY KEY,
         email TEXT NOT NULL UNIQUE,
         categories TEXT NOT NULL,
+        gender TEXT NOT NULL DEFAULT 'any',
         unsubscribe_token TEXT NOT NULL UNIQUE,
         active INTEGER NOT NULL DEFAULT 1,
         created_at TEXT NOT NULL,
@@ -52,4 +53,18 @@ async function ensureSchema(db: Client): Promise<void> {
     ],
     "write",
   );
+
+  await ensureColumn(
+    db,
+    "subscriptions",
+    "gender",
+    "ALTER TABLE subscriptions ADD COLUMN gender TEXT NOT NULL DEFAULT 'any'",
+  );
+}
+
+async function ensureColumn(db: Client, table: string, column: string, alterSql: string): Promise<void> {
+  const result = await db.execute(`PRAGMA table_info(${table})`);
+  if (result.rows.some((row) => String(row.name) === column)) return;
+
+  await db.execute(alterSql);
 }

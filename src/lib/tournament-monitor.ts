@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
 import { getDb } from "./database";
 import { sendNewTournamentEmail } from "./email";
+import { parseGenderLabel } from "./gender";
 import { scrapePublishedTournaments } from "./scraper";
-import { listActiveSubscriptionsForCategory } from "./subscriptions";
+import { listActiveSubscriptionsForTournament } from "./subscriptions";
 import type { PublishedTournament, SubscriptionCategory, TournamentCategory } from "./types";
 
 type NotificationError = {
@@ -51,7 +52,10 @@ export async function checkForNewTournamentPublications(): Promise<TournamentMon
       continue;
     }
 
-    const subscriptions = await listActiveSubscriptionsForCategory(tournament.category);
+    const subscriptions = await listActiveSubscriptionsForTournament(
+      tournament.category,
+      parseGenderLabel(tournament.gender),
+    );
     for (const subscription of subscriptions) {
       emailsAttempted += 1;
       try {

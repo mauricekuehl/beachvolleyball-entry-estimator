@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseGenderLabel } from "../lib/gender";
 import {
   isAdmissionPublished,
   parsePublishedTournaments,
@@ -10,6 +11,12 @@ import {
 } from "../lib/scraper";
 
 describe("scraper parsers", () => {
+  it("normalizes overview gender labels", () => {
+    expect(parseGenderLabel("m")).toBe("male");
+    expect(parseGenderLabel("w")).toBe("female");
+    expect(parseGenderLabel("Mixed")).toBe("mixed");
+  });
+
   it("parses tournament metadata from summary and details tables", () => {
     const summaryHtml = `
       <h1 class="samsCmsComponentHeader">Beachfreunde A+Cup(m)</h1>

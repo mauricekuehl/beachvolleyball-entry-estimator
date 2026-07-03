@@ -180,12 +180,31 @@ h1 {
   gap: 14px;
 }
 
+.field-group {
+  display: grid;
+  gap: 8px;
+}
+
+.field-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 .category-list {
   display: grid;
   gap: 8px;
 }
 
-.category-row {
+.choice-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.category-row,
+.choice-row {
   width: 100%;
   min-height: 54px;
   display: flex;
@@ -202,8 +221,26 @@ h1 {
   text-align: left;
 }
 
-.category-row.active {
+.category-row.active,
+.choice-row.active {
   border-color: var(--foreground);
+}
+
+.radio-mark {
+  position: relative;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--foreground);
+  border-radius: 50%;
+}
+
+.choice-row.active .radio-mark::after {
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: var(--foreground);
+  content: "";
 }
 
 .toggle-switch {
@@ -394,6 +431,7 @@ td {
 
   .url-form,
   .email-row,
+  .choice-list,
   .rule-panel {
     display: grid;
     grid-template-columns: 1fr;

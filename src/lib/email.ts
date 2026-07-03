@@ -1,4 +1,5 @@
 import { getAppBaseUrl, requireEnv } from "./config";
+import { formatRawGenderLabel } from "./gender";
 import type { PublishedTournament } from "./types";
 
 type SendTournamentEmailInput = {
@@ -19,6 +20,7 @@ export async function sendNewTournamentEmail({
   tournament,
 }: SendTournamentEmailInput): Promise<EmailSendResult> {
   const unsubscribeUrl = `${getAppBaseUrl()}/api/unsubscribe?token=${encodeURIComponent(unsubscribeToken)}`;
+  const genderLabel = formatRawGenderLabel(tournament.gender);
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -29,7 +31,7 @@ export async function sendNewTournamentEmail({
     body: JSON.stringify({
       from: formatSender(),
       to: [email],
-      subject: `New ${tournament.categoryLabel || tournament.category} tournament published`,
+      subject: `New ${genderLabel} ${tournament.categoryLabel || tournament.category} tournament published`,
       html: buildHtmlContent(tournament, unsubscribeUrl),
       text: buildTextContent(tournament, unsubscribeUrl),
       headers: {
@@ -57,11 +59,14 @@ function formatSender(): string {
 }
 
 function buildHtmlContent(tournament: PublishedTournament, unsubscribeUrl: string): string {
+  const genderLabel = formatRawGenderLabel(tournament.gender);
+
   return `
     <p>A new BeachvolleyBB tournament was published:</p>
     <p>
       <strong>${escapeHtml(tournament.name)}</strong><br>
       ${escapeHtml(tournament.categoryLabel || tournament.category)}<br>
+      Gender: ${escapeHtml(genderLabel)}<br>
       ${escapeHtml(tournament.date || "Date not listed")}<br>
       ${escapeHtml(tournament.location || "Location not listed")}
     </p>
@@ -73,11 +78,14 @@ function buildHtmlContent(tournament: PublishedTournament, unsubscribeUrl: strin
 }
 
 function buildTextContent(tournament: PublishedTournament, unsubscribeUrl: string): string {
+  const genderLabel = formatRawGenderLabel(tournament.gender);
+
   return [
     "A new BeachvolleyBB tournament was published:",
     "",
     tournament.name,
     tournament.categoryLabel || tournament.category,
+    `Gender: ${genderLabel}`,
     tournament.date || "Date not listed",
     tournament.location || "Location not listed",
     "",

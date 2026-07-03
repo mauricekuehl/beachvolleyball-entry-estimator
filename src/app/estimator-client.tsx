@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
-import type { EstimateResponse, EstimatedTeam, SubscriptionCategory } from "@/lib/types";
+import type { EstimateResponse, EstimatedTeam, SubscriptionCategory, SubscriptionGender } from "@/lib/types";
 
 type ApiError = {
   error: string;
@@ -13,6 +13,11 @@ type TabId = "automatic" | "waitlist" | "all" | "unresolved";
 type SubscriptionStatus = { kind: "success" | "error"; message: string } | null;
 
 const CATEGORY_OPTIONS = ["Premium", "A+", "A", "B", "C"] as const satisfies readonly SubscriptionCategory[];
+const GENDER_OPTIONS = [
+  { value: "male", label: "Men" },
+  { value: "female", label: "Women" },
+  { value: "mixed", label: "Mixed" },
+] as const satisfies readonly { value: SubscriptionGender; label: string }[];
 
 export function EstimatorClient() {
   const [mode, setMode] = useState<Mode>("estimate");
@@ -23,6 +28,7 @@ export function EstimatorClient() {
   const [activeTab, setActiveTab] = useState<TabId>("automatic");
   const [email, setEmail] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<SubscriptionCategory[]>([...CATEGORY_OPTIONS]);
+  const [selectedGender, setSelectedGender] = useState<SubscriptionGender>("male");
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>(null);
 
@@ -66,7 +72,7 @@ export function EstimatorClient() {
       const response = await fetch("/api/subscriptions", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, categories: selectedCategories }),
+        body: JSON.stringify({ email, categories: selectedCategories, gender: selectedGender }),
       });
       const payload = (await response.json()) as { ok?: boolean; error?: string };
 
@@ -200,21 +206,42 @@ export function EstimatorClient() {
             Sends an email when new tournaments are published in the selected categories.
           </p>
           <form className="subscribe-form" onSubmit={submitSubscription}>
-            <div className="category-list" aria-label="Tournament categories">
-              {CATEGORY_OPTIONS.map((category) => (
-                <button
-                  key={category}
-                  type="button"
-                  className={`category-row ${selectedCategories.includes(category) ? "active" : ""}`}
-                  aria-pressed={selectedCategories.includes(category)}
-                  onClick={() => toggleCategory(category)}
-                >
-                  <span>{category}</span>
-                  <span className="toggle-switch" aria-hidden="true">
-                    <span />
-                  </span>
-                </button>
-              ))}
+            <div className="field-group">
+              <span className="field-label">Gender</span>
+              <div className="choice-list" role="radiogroup" aria-label="Tournament gender">
+                {GENDER_OPTIONS.map((gender) => (
+                  <button
+                    key={gender.value}
+                    type="button"
+                    role="radio"
+                    className={`choice-row ${selectedGender === gender.value ? "active" : ""}`}
+                    aria-checked={selectedGender === gender.value}
+                    onClick={() => setSelectedGender(gender.value)}
+                  >
+                    <span>{gender.label}</span>
+                    <span className="radio-mark" aria-hidden="true" />
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="field-group">
+              <span className="field-label">Categories</span>
+              <div className="category-list" aria-label="Tournament categories">
+                {CATEGORY_OPTIONS.map((category) => (
+                  <button
+                    key={category}
+                    type="button"
+                    className={`category-row ${selectedCategories.includes(category) ? "active" : ""}`}
+                    aria-pressed={selectedCategories.includes(category)}
+                    onClick={() => toggleCategory(category)}
+                  >
+                    <span>{category}</span>
+                    <span className="toggle-switch" aria-hidden="true">
+                      <span />
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="email-row">
               <input

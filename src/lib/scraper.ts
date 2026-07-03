@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { parseGenderLabel } from "./gender";
 import type {
   Player,
   PlayerRanking,
@@ -127,7 +128,7 @@ export function parseTournamentMetadata({
     name: summary.get("turnier") ?? titleFromHtml(summaryHtml) ?? `Tournament ${id}`,
     category: parseCategory(categoryLabel),
     categoryLabel,
-    gender: parseGender(summary.get("geschlecht") ?? ""),
+    gender: parseGenderLabel(summary.get("geschlecht") ?? ""),
     date: summary.get("datum") ?? "",
     registrationCount: parseInteger(summary.get("gemeldete mannschaften")),
     mainDrawTeams,
@@ -340,14 +341,6 @@ export function parseCategory(label: string): TournamentCategory {
   if (normalized.includes("kategorie b") || /\bb\b/.test(normalized)) return "B";
   if (normalized.includes("kategorie c") || /\bc\b/.test(normalized)) return "C";
   return "Unknown";
-}
-
-export function parseGender(label: string): TournamentGender {
-  const normalized = normalizeWhitespace(label).toLowerCase();
-  if (normalized.includes("mixed")) return "mixed";
-  if (normalized.includes("maennlich") || normalized.includes("männlich") || normalized.includes("(m)")) return "male";
-  if (normalized.includes("weiblich") || normalized.includes("(w)")) return "female";
-  return "unknown";
 }
 
 export function teamDetailUrl(teamId: string): string {

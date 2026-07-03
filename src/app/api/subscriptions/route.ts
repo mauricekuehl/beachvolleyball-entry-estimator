@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   try {
     const input = parseSubscriptionInput(await request.json());
-    await upsertSubscription(input.email, input.categories);
+    await upsertSubscription(input.email, input.categories, input.gender);
 
     return Response.json({ ok: true });
   } catch (error) {
