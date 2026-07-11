@@ -210,11 +210,21 @@ export function EstimatorClient({ initialTournamentId }: { initialTournamentId?:
                 <span>Abgerufen: {new Date(result.dataSources.fetchedAt).toLocaleString("de-DE")}</span>
               </section>
 
-              <section className="result-actions" aria-label="Teilen">
-                <button className="share-button" type="button" onClick={copyShareLink}>
-                  Link kopieren
-                </button>
-                {shareStatus ? <span className="share-status">{shareStatus}</span> : null}
+              <section className="result-actions" aria-label="Turnieraktionen">
+                <a className="external-link-button" href={result.tournament.url} target="_blank" rel="noreferrer">
+                  BVV Online öffnen
+                </a>
+                <details className="share-menu">
+                  <summary aria-label="Teilen" title="Teilen">
+                    <ShareIcon />
+                  </summary>
+                  <div className="share-popover">
+                    <button type="button" onClick={copyShareLink}>
+                      Link kopieren
+                    </button>
+                    {shareStatus ? <span>{shareStatus}</span> : null}
+                  </div>
+                </details>
               </section>
 
               <section className="table-section">
@@ -312,6 +322,16 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function ShareIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+      <path d="M15.5 5.5 12 2 8.5 5.5" />
+      <path d="M12 2v13" />
+      <path d="M6 10H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1" />
+    </svg>
+  );
+}
+
 function TeamTable({ teams, showSourceBucket }: { teams: EstimatedTeam[]; showSourceBucket: boolean }) {
   if (teams.length === 0) {
     return <div className="no-rows">Keine Teams in dieser Ansicht.</div>;
@@ -334,11 +354,11 @@ function TeamTable({ teams, showSourceBucket }: { teams: EstimatedTeam[]; showSo
         <tbody>
           {teams.map((team) => (
             <tr key={team.id}>
-              <td>
+              <td data-label="Status">
                 <span className={`status ${team.status}`}>{formatStatus(team.status)}</span>
               </td>
-              <td>{team.predictedRank ?? "-"}</td>
-              <td>
+              <td data-label="Rang">{team.predictedRank ?? "-"}</td>
+              <td data-label="Team">
                 <strong>
                   {team.players.length > 0 ? (
                     <span className="player-links">
@@ -365,10 +385,10 @@ function TeamTable({ teams, showSourceBucket }: { teams: EstimatedTeam[]; showSo
                 </strong>
                 <span>{team.club}</span>
               </td>
-              <td>{team.lvPoints}</td>
-              <td>{team.dvvPoints}</td>
-              {showSourceBucket ? <td>{formatSourceBucket(team.sourceBucket)}</td> : null}
-              <td>{team.registeredAt || "-"}</td>
+              <td data-label="LV">{team.lvPoints}</td>
+              <td data-label="DVV">{team.dvvPoints}</td>
+              {showSourceBucket ? <td data-label="Wertung">{formatSourceBucket(team.sourceBucket)}</td> : null}
+              <td data-label="Angemeldet">{team.registeredAt || "-"}</td>
             </tr>
           ))}
         </tbody>

@@ -64,7 +64,7 @@ export function estimateAdmissions(tournament: TournamentMetadata, teams: Regist
   const waitlist = eligible
     .filter((team) => !automaticIds.has(team.id))
     .toSorted(rule.inverseLv ? compareBy("LV", true) : compareBy("LV", false))
-    .map((team) => ({ ...team, status: "waitlist" as const, predictedRank: null }));
+    .map((team, index) => ({ ...team, status: "waitlist" as const, predictedRank: automatic.length + index + 1 }));
 
   return {
     ruleSummary: rule.summary,
