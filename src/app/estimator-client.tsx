@@ -1,6 +1,7 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { EstimateResponse, EstimatedTeam, SubscriptionCategory, SubscriptionGender } from "@/lib/types";
 
 type ApiError = {
@@ -9,40 +10,43 @@ type ApiError = {
 };
 
 type Mode = "estimate" | "subscribe";
-type TabId = "automatic" | "waitlist" | "all" | "unresolved";
 type SubscriptionStatus = { kind: "success" | "error"; message: string } | null;
 
 const CATEGORY_OPTIONS = ["Premium", "A+", "A", "B", "C"] as const satisfies readonly SubscriptionCategory[];
 const GENDER_OPTIONS = [
-  { value: "male", label: "Men" },
-  { value: "female", label: "Women" },
+  { value: "male", label: "Männer" },
+  { value: "female", label: "Frauen" },
   { value: "mixed", label: "Mixed" },
 ] as const satisfies readonly { value: SubscriptionGender; label: string }[];
 
-export function EstimatorClient() {
+const BEACHVOLLEYBB_TOURNAMENT_PATH = "/cms/home/beachtour/erwachsene/turniere.xhtml";
+
+export function EstimatorClient({ initialTournamentId }: { initialTournamentId?: string }) {
+  const router = useRouter();
+  const initialTournamentUrl = initialTournamentId ? buildBeachvolleyBbTournamentUrl(initialTournamentId) : "";
   const [mode, setMode] = useState<Mode>("estimate");
-  const [url, setUrl] = useState("");
+  const [url, setUrl] = useState(initialTournamentUrl);
   const [result, setResult] = useState<EstimateResponse | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabId>("automatic");
   const [email, setEmail] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<SubscriptionCategory[]>([...CATEGORY_OPTIONS]);
   const [selectedGender, setSelectedGender] = useState<SubscriptionGender>("male");
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>(null);
+  const [shareStatus, setShareStatus] = useState("");
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  const loadEstimate = useCallback(async (tournamentUrl: string) => {
     setLoading(true);
     setResult(null);
     setError(null);
+    setShareStatus("");
 
     try {
       const response = await fetch("/api/estimate", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ tournamentUrl: url }),
+        body: JSON.stringify({ tournamentUrl }),
       });
       const payload = (await response.json()) as EstimateResponse | ApiError;
 
@@ -52,15 +56,41 @@ export function EstimatorClient() {
       }
 
       setResult(payload as EstimateResponse);
-      setActiveTab("automatic");
     } catch {
       setError({
-        error: "Could not reach the estimator API.",
+        error: "Die Schätzung konnte nicht erreicht werden.",
         code: "NETWORK_ERROR",
       });
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    if (!initialTournamentId) return;
+
+    const timer = window.setTimeout(() => {
+      void loadEstimate(buildBeachvolleyBbTournamentUrl(initialTournamentId));
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [initialTournamentId, loadEstimate]);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const tournamentId = extractTournamentId(url);
+
+    if (!tournamentId) {
+      setError({
+        error: "Die URL muss eine BeachvolleyBB-Turnier-ID enthalten.",
+        code: "MISSING_TOURNEY_ID",
+      });
+      return;
+    }
+
+    setError(null);
+    setResult(null);
+    router.replace(buildTournamentAppPath(tournamentId));
   }
 
   async function submitSubscription(event: FormEvent<HTMLFormElement>) {
@@ -79,19 +109,19 @@ export function EstimatorClient() {
       if (!response.ok) {
         setSubscriptionStatus({
           kind: "error",
-          message: payload.error || "Could not save the subscription.",
+          message: payload.error || "Das Abo konnte nicht gespeichert werden.",
         });
         return;
       }
 
       setSubscriptionStatus({
         kind: "success",
-        message: "Subscription saved.",
+        message: "Abo gespeichert.",
       });
     } catch {
       setSubscriptionStatus({
         kind: "error",
-        message: "Could not reach the subscription API.",
+        message: "Der Abo-Dienst konnte nicht erreicht werden.",
       });
     } finally {
       setSubscriptionLoading(false);
@@ -104,29 +134,33 @@ export function EstimatorClient() {
     );
   }
 
-  const visibleTeams = useMemo(() => {
-    if (!result) return [];
-    if (activeTab === "automatic") return result.automatic;
-    if (activeTab === "waitlist") return result.waitlist;
-    if (activeTab === "unresolved") return result.unresolved;
-    return result.allTeams;
-  }, [activeTab, result]);
+  async function copyShareLink() {
+    if (!result) return;
+
+    const shareUrl = `${window.location.origin}${buildTournamentAppPath(result.tournament.id)}`;
+    try {
+      await copyToClipboard(shareUrl);
+      setShareStatus("Link kopiert.");
+    } catch {
+      setShareStatus("Link konnte nicht kopiert werden.");
+    }
+  }
 
   return (
     <main className="shell">
       <section className="intro">
         <div>
           <p className="eyebrow">Beach Tour Berlin-Brandenburg</p>
-          <h1>Tournament tools</h1>
+          <h1>Turnier-Tools</h1>
         </div>
-        <div className="mode-actions" aria-label="Choose tool">
+        <div className="mode-actions" aria-label="Tool auswählen">
           <button
             className={mode === "estimate" ? "active" : ""}
             type="button"
             aria-pressed={mode === "estimate"}
             onClick={() => setMode("estimate")}
           >
-            Estimate Zulassung
+            Zulassung schätzen
           </button>
           <button
             className={mode === "subscribe" ? "active" : ""}
@@ -134,7 +168,7 @@ export function EstimatorClient() {
             aria-pressed={mode === "subscribe"}
             onClick={() => setMode("subscribe")}
           >
-            Subscribe to new tournaments
+            Neue Turniere abonnieren
           </button>
         </div>
       </section>
@@ -143,13 +177,13 @@ export function EstimatorClient() {
         <>
           <form className="url-form" onSubmit={submit}>
             <input
-              aria-label="BeachvolleyBB tournament URL"
+              aria-label="BeachvolleyBB-Turnier-URL"
               value={url}
               onChange={(event) => setUrl(event.target.value)}
               placeholder="https://www.beachvolleybb.de/cms/home/beachtour/erwachsene/turniere.xhtml?BeachTourneyComponent.tourneyId=..."
             />
             <button type="submit" disabled={loading || !url.trim()}>
-              {loading ? "Estimating" : "Estimate"}
+              {loading ? "Wird geschätzt" : "Schätzen"}
             </button>
           </form>
 
@@ -162,53 +196,52 @@ export function EstimatorClient() {
 
           {result ? (
             <>
-              <section className="summary-grid" aria-label="Tournament summary">
-                <Metric label="Tournament" value={result.tournament.name} />
-                <Metric label="Category" value={result.tournament.categoryLabel || result.tournament.category} />
-                <Metric label="Date" value={result.tournament.date || "Unknown"} />
-                <Metric label="Automatic spots" value={String(result.tournament.automaticCapacity)} />
+              <section className="summary-grid" aria-label="Turnierübersicht">
+                <Metric label="Turnier" value={result.tournament.name} />
+                <Metric label="Kategorie" value={result.tournament.categoryLabel || result.tournament.category} />
+                <Metric label="Datum" value={result.tournament.date || "Unbekannt"} />
+                <Metric label="Zulassungsplätze" value={String(result.tournament.automaticCapacity)} />
                 <Metric label="Wildcards" value={String(result.tournament.wildcardMainDraw)} />
-                <Metric label="Registrations" value={String(result.allTeams.length)} />
+                <Metric label="Meldungen" value={String(result.allTeams.length)} />
               </section>
 
               <section className="rule-panel">
                 <strong>{result.ruleSummary}</strong>
-                <span>Fetched {new Date(result.dataSources.fetchedAt).toLocaleString()}</span>
+                <span>Abgerufen: {new Date(result.dataSources.fetchedAt).toLocaleString("de-DE")}</span>
+              </section>
+
+              <section className="result-actions" aria-label="Teilen">
+                <button className="share-button" type="button" onClick={copyShareLink}>
+                  Link kopieren
+                </button>
+                {shareStatus ? <span className="share-status">{shareStatus}</span> : null}
               </section>
 
               <section className="table-section">
-                <div className="tabs" role="tablist" aria-label="Estimate views">
-                  <TabButton id="automatic" active={activeTab} count={result.automatic.length} onClick={setActiveTab}>
-                    Automatic
-                  </TabButton>
-                  <TabButton id="waitlist" active={activeTab} count={result.waitlist.length} onClick={setActiveTab}>
-                    Waitlist
-                  </TabButton>
-                  <TabButton id="all" active={activeTab} count={result.allTeams.length} onClick={setActiveTab}>
-                    All
-                  </TabButton>
-                  <TabButton id="unresolved" active={activeTab} count={result.unresolved.length} onClick={setActiveTab}>
-                    Unresolved
-                  </TabButton>
+                <div className="tabs" role="tablist" aria-label="Schätzansicht">
+                  <button className="active" type="button">
+                    Alle <span>{result.allTeams.length}</span>
+                  </button>
                 </div>
-                <TeamTable teams={visibleTeams} />
+                <TeamTable teams={result.allTeams} showSourceBucket={shouldShowSourceBucket(result)} />
               </section>
             </>
           ) : (
             <section className="empty-state">
-              Paste a public adult tournament link from beachvolleybb.de to estimate automatic entry from registrations.
+              Füge einen öffentlichen Erwachsenen-Turnierlink von beachvolleybb.de ein, um die Zulassung aus den
+              Meldungen zu schätzen.
             </section>
           )}
         </>
       ) : (
         <section className="subscribe-panel">
           <p className="subscribe-copy">
-            Sends an email when new tournaments are published in the selected categories.
+            Sendet eine E-Mail, wenn neue Turniere in den ausgewählten Kategorien veröffentlicht werden.
           </p>
           <form className="subscribe-form" onSubmit={submitSubscription}>
             <div className="field-group">
-              <span className="field-label">Gender</span>
-              <div className="choice-list" role="radiogroup" aria-label="Tournament gender">
+              <span className="field-label">Geschlecht</span>
+              <div className="choice-list" role="radiogroup" aria-label="Turniergeschlecht">
                 {GENDER_OPTIONS.map((gender) => (
                   <button
                     key={gender.value}
@@ -225,8 +258,8 @@ export function EstimatorClient() {
               </div>
             </div>
             <div className="field-group">
-              <span className="field-label">Categories</span>
-              <div className="category-list" aria-label="Tournament categories">
+              <span className="field-label">Kategorien</span>
+              <div className="category-list" aria-label="Turnierkategorien">
                 {CATEGORY_OPTIONS.map((category) => (
                   <button
                     key={category}
@@ -245,14 +278,14 @@ export function EstimatorClient() {
             </div>
             <div className="email-row">
               <input
-                aria-label="Email address"
+                aria-label="E-Mail-Adresse"
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
-                placeholder="you@example.com"
+                placeholder="du@example.com"
               />
               <button type="submit" disabled={subscriptionLoading || !email.trim() || selectedCategories.length === 0}>
-                {subscriptionLoading ? "Saving" : "Subscribe"}
+                {subscriptionLoading ? "Wird gespeichert" : "Abonnieren"}
               </button>
             </div>
           </form>
@@ -265,7 +298,7 @@ export function EstimatorClient() {
         </section>
       )}
 
-      <footer className="contact-note">Contact: main@mauricekuehl.com</footer>
+      <footer className="contact-note">Kontakt: main@mauricekuehl.com</footer>
     </main>
   );
 }
@@ -279,29 +312,9 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function TabButton({
-  id,
-  active,
-  count,
-  onClick,
-  children,
-}: {
-  id: TabId;
-  active: TabId;
-  count: number;
-  onClick: (id: TabId) => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button className={active === id ? "active" : ""} type="button" onClick={() => onClick(id)}>
-      {children} <span>{count}</span>
-    </button>
-  );
-}
-
-function TeamTable({ teams }: { teams: EstimatedTeam[] }) {
+function TeamTable({ teams, showSourceBucket }: { teams: EstimatedTeam[]; showSourceBucket: boolean }) {
   if (teams.length === 0) {
-    return <div className="no-rows">No teams in this view.</div>;
+    return <div className="no-rows">Keine Teams in dieser Ansicht.</div>;
   }
 
   return (
@@ -310,20 +323,19 @@ function TeamTable({ teams }: { teams: EstimatedTeam[] }) {
         <thead>
           <tr>
             <th>Status</th>
-            <th>Rank</th>
+            <th>Rang</th>
             <th>Team</th>
             <th>LV</th>
             <th>DVV</th>
-            <th>Source</th>
-            <th>Registered</th>
-            <th>Notes</th>
+            {showSourceBucket ? <th>Wertung</th> : null}
+            <th>Angemeldet</th>
           </tr>
         </thead>
         <tbody>
           {teams.map((team) => (
             <tr key={team.id}>
               <td>
-                <span className={`status ${team.status}`}>{team.status}</span>
+                <span className={`status ${team.status}`}>{formatStatus(team.status)}</span>
               </td>
               <td>{team.predictedRank ?? "-"}</td>
               <td>
@@ -355,13 +367,85 @@ function TeamTable({ teams }: { teams: EstimatedTeam[] }) {
               </td>
               <td>{team.lvPoints}</td>
               <td>{team.dvvPoints}</td>
-              <td>{team.sourceBucket}</td>
+              {showSourceBucket ? <td>{formatSourceBucket(team.sourceBucket)}</td> : null}
               <td>{team.registeredAt || "-"}</td>
-              <td>{team.notes.length ? team.notes.join(" ") : "-"}</td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
   );
+}
+
+function shouldShowSourceBucket(result: EstimateResponse): boolean {
+  return result.tournament.category === "Premium" || result.tournament.category === "A+" || result.tournament.category === "A";
+}
+
+function buildBeachvolleyBbTournamentUrl(tournamentId: string): string {
+  const url = new URL(BEACHVOLLEYBB_TOURNAMENT_PATH, "https://www.beachvolleybb.de");
+  url.searchParams.set("BeachTourneyComponent.view", "registrations");
+  url.searchParams.set("BeachTourneyComponent.tourneyId", tournamentId);
+  return url.toString();
+}
+
+function buildTournamentAppPath(tournamentId: string): string {
+  return `/tournament?id=${encodeURIComponent(tournamentId)}`;
+}
+
+function extractTournamentId(rawUrl: string): string | null {
+  try {
+    const parsed = new URL(rawUrl.trim());
+    const beachvolleyId = parsed.searchParams.get("BeachTourneyComponent.tourneyId");
+    const appId = parsed.searchParams.get("id");
+    const id = beachvolleyId || appId;
+    return id && /^\d+$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+async function copyToClipboard(value: string): Promise<void> {
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.append(textarea);
+  textarea.select();
+
+  try {
+    if (!document.execCommand("copy")) {
+      throw new Error("Copy command failed.");
+    }
+  } finally {
+    textarea.remove();
+  }
+}
+
+function formatStatus(status: EstimatedTeam["status"]): string {
+  switch (status) {
+    case "automatic":
+      return "Zugelassen";
+    case "waitlist":
+      return "Warteliste";
+    case "unresolved":
+      return "Ungeklärt";
+  }
+}
+
+function formatSourceBucket(sourceBucket: EstimatedTeam["sourceBucket"]): string {
+  switch (sourceBucket) {
+    case "DVV":
+      return "DVV";
+    case "LV":
+      return "Landesverband";
+    case "INVERSE_LV":
+      return "Inverse LV-Wertung";
+    case "UNRESOLVED":
+      return "Ungeklärt";
+  }
 }

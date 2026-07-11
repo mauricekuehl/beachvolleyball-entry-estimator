@@ -108,7 +108,8 @@ h1 {
 
 .url-form button,
 .email-row button,
-.tabs button {
+.tabs button,
+.share-button {
   border: 1px solid var(--foreground);
   border-radius: 6px;
   background: var(--foreground);
@@ -133,7 +134,8 @@ h1 {
 .empty-state,
 .rule-panel,
 .metric,
-.table-section {
+.table-section,
+.result-actions {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--panel);
@@ -141,7 +143,8 @@ h1 {
 
 .notice,
 .empty-state,
-.rule-panel {
+.rule-panel,
+.result-actions {
   padding: 16px;
 }
 
@@ -315,6 +318,23 @@ td span {
   margin-bottom: 12px;
 }
 
+.result-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.share-button {
+  min-height: 40px;
+  padding: 0 14px;
+}
+
+.share-status {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .table-section {
   overflow: hidden;
 }
@@ -350,7 +370,7 @@ td span {
 
 table {
   width: 100%;
-  min-width: 980px;
+  min-width: 860px;
   border-collapse: collapse;
 }
 
@@ -432,7 +452,8 @@ td {
   .url-form,
   .email-row,
   .choice-list,
-  .rule-panel {
+  .rule-panel,
+  .result-actions {
     display: grid;
     grid-template-columns: 1fr;
   }

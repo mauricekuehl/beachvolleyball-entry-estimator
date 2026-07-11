@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Beachvolleyball Entry Estimator",
-  description: "Estimate BeachvolleyBB tournament admissions from public registrations.",
+  title: "Beachvolleyball-Zulassungsschätzung",
+  description: "Schätzt BeachvolleyBB-Zulassungen aus öffentlichen Meldelisten.",
 };
 
 export default function RootLayout({
@@ -23,7 +23,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable}`}>
+    <html lang="de" className={`${geistSans.variable} ${geistMono.variable}`}>
       <body>{children}</body>
     </html>
   );

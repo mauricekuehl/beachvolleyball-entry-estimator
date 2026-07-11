@@ -33,7 +33,7 @@ async function runProtectedCron(request: Request) {
 
     console.error(error);
     return Response.json(
-      { error: "Tournament notification check failed.", code: "TOURNAMENT_CHECK_FAILED" },
+      { error: "Die Turnierbenachrichtigungsprüfung ist fehlgeschlagen.", code: "TOURNAMENT_CHECK_FAILED" },
       { status: 500 },
     );
   }

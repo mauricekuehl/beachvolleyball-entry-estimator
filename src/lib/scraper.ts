@@ -35,17 +35,17 @@ export function parseTournamentUrl(rawUrl: string): { id: string; normalizedUrl:
   try {
     parsed = new URL(rawUrl.trim());
   } catch {
-    throw new EstimateError("Paste a valid BeachvolleyBB tournament URL.", 400, "INVALID_URL");
+    throw new EstimateError("Füge eine gültige BeachvolleyBB-Turnier-URL ein.", 400, "INVALID_URL");
   }
 
   const host = parsed.hostname.toLowerCase();
   if (host !== "www.beachvolleybb.de" && host !== "beachvolleybb.de") {
-    throw new EstimateError("Only beachvolleybb.de tournament links are supported.", 400, "INVALID_DOMAIN");
+    throw new EstimateError("Es werden nur Turnierlinks von beachvolleybb.de unterstützt.", 400, "INVALID_DOMAIN");
   }
 
   const id = parsed.searchParams.get("BeachTourneyComponent.tourneyId");
   if (!id || !/^\d+$/.test(id)) {
-    throw new EstimateError("The URL must contain a BeachTourneyComponent.tourneyId value.", 400, "MISSING_TOURNEY_ID");
+    throw new EstimateError("Die URL muss eine BeachTourneyComponent.tourneyId enthalten.", 400, "MISSING_TOURNEY_ID");
   }
 
   return {
@@ -73,7 +73,7 @@ export async function scrapeBeachvolleyBb(rawUrl: string, fetcher: Fetcher = fet
 
   if (isAdmissionPublished(admissionsHtml)) {
     throw new EstimateError(
-      "The Zulassungsliste is already publicly available.",
+      "Die Zulassungsliste ist bereits öffentlich verfügbar.",
       409,
       "ADMISSIONS_ALREADY_PUBLIC",
     );
@@ -88,7 +88,7 @@ export async function scrapeBeachvolleyBb(rawUrl: string, fetcher: Fetcher = fet
   const registeredTeams = parseRegistrations(registrationsHtml);
 
   if (registeredTeams.length === 0) {
-    throw new EstimateError("No public registrations were found for this tournament.", 404, "NO_REGISTRATIONS");
+    throw new EstimateError("Für dieses Turnier wurden keine öffentlichen Meldungen gefunden.", 404, "NO_REGISTRATIONS");
   }
 
   const teams = await hydrateRegisteredTeams(registeredTeams, tournament, cachedFetcher);
@@ -119,13 +119,13 @@ export function parseTournamentMetadata({
   const wildcardMainDraw = parseInteger(details.get("anzahl wildcards hauptfeld")) ?? 0;
 
   if (!mainDrawTeams) {
-    throw new EstimateError("Could not parse the main draw team count.", 502, "PARSE_MAIN_DRAW");
+    throw new EstimateError("Die Anzahl der Hauptfeldteams konnte nicht ausgelesen werden.", 502, "PARSE_MAIN_DRAW");
   }
 
   return {
     id,
     url,
-    name: summary.get("turnier") ?? titleFromHtml(summaryHtml) ?? `Tournament ${id}`,
+    name: summary.get("turnier") ?? titleFromHtml(summaryHtml) ?? `Turnier ${id}`,
     category: parseCategory(categoryLabel),
     categoryLabel,
     gender: parseGenderLabel(summary.get("geschlecht") ?? ""),
@@ -231,7 +231,7 @@ export function parseTeamDetails(html: string): Pick<RegisteredTeam, "players" |
 
   return {
     players: players.slice(0, 2),
-    notes: players.length < 2 ? ["Could not resolve both public player profiles."] : [],
+    notes: players.length < 2 ? ["Nicht beide öffentlichen Spielerprofile konnten aufgelöst werden."] : [],
   };
 }
 
@@ -243,7 +243,7 @@ export function parsePlayerDetails(html: string, gender: TournamentGender, prefe
 
   return {
     userId: "",
-    name: titleName || "Unknown player",
+    name: titleName || "Unbekannter Spieler",
     dvvLicense: extractDvvLicense($),
     lvRanking: pickBestRanking(rankings, "LV", genderLabel, preferredSeason),
     dvvRanking: pickBestRanking(rankings, "DVV", genderLabel, preferredSeason),
@@ -369,7 +369,7 @@ async function hydrateRegisteredTeams(
     teams.map(async (team) => {
       const teamDetails = await fetcher(teamDetailUrl(team.id))
         .then(parseTeamDetails)
-        .catch(() => ({ players: [], notes: ["Could not fetch public team details."] }));
+        .catch(() => ({ players: [], notes: ["Öffentliche Teamdetails konnten nicht abgerufen werden."] }));
 
       const players = await Promise.all(
         teamDetails.players.map(async (player) => {
@@ -431,7 +431,7 @@ async function fetchUncachedText(url: string): Promise<string> {
   });
 
   if (!response.ok) {
-    throw new EstimateError(`BeachvolleyBB returned ${response.status} for ${url}.`, 502, "UPSTREAM_FETCH");
+    throw new EstimateError(`BeachvolleyBB hat ${response.status} für ${url} zurückgegeben.`, 502, "UPSTREAM_FETCH");
   }
 
   const html = await response.text();
@@ -517,7 +517,7 @@ async function fetchPrimeFacesDataTablePage(
   });
 
   if (!response.ok) {
-    throw new EstimateError(`BeachvolleyBB returned ${response.status} for ${url}.`, 502, "UPSTREAM_FETCH");
+    throw new EstimateError(`BeachvolleyBB hat ${response.status} für ${url} zurückgegeben.`, 502, "UPSTREAM_FETCH");
   }
 
   return response.text();

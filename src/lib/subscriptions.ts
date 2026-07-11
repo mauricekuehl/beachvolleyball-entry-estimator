@@ -28,25 +28,25 @@ export function parseSubscriptionInput(input: unknown): {
   gender: SubscriptionGender;
 } {
   if (!input || typeof input !== "object") {
-    throw new SubscriptionInputError("Request body must be an object.", "INVALID_BODY");
+    throw new SubscriptionInputError("Die Anfrage ist ungültig.", "INVALID_BODY");
   }
 
   const body = input as { email?: unknown; categories?: unknown; gender?: unknown };
   if (typeof body.email !== "string" || !isValidEmail(body.email)) {
-    throw new SubscriptionInputError("Enter a valid email address.", "INVALID_EMAIL");
+    throw new SubscriptionInputError("Gib eine gültige E-Mail-Adresse ein.", "INVALID_EMAIL");
   }
 
   if (!Array.isArray(body.categories)) {
-    throw new SubscriptionInputError("Choose at least one category.", "INVALID_CATEGORIES");
+    throw new SubscriptionInputError("Wähle mindestens eine Kategorie aus.", "INVALID_CATEGORIES");
   }
 
   const categories = [...new Set(body.categories)].filter(isSubscriptionCategory);
   if (categories.length === 0) {
-    throw new SubscriptionInputError("Choose at least one category.", "INVALID_CATEGORIES");
+    throw new SubscriptionInputError("Wähle mindestens eine Kategorie aus.", "INVALID_CATEGORIES");
   }
 
   if (!isSubscriptionGender(body.gender)) {
-    throw new SubscriptionInputError("Choose one gender.", "INVALID_GENDER");
+    throw new SubscriptionInputError("Wähle ein Geschlecht aus.", "INVALID_GENDER");
   }
 
   return {
