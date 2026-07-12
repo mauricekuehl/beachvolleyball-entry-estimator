@@ -88,6 +88,22 @@ describe("estimateAdmissions", () => {
     expect(estimate.automatic.map((entry) => entry.id)).toEqual(["low", "mid"]);
   });
 
+  it("continues predicted ranks through the waitlist", () => {
+    const estimate = estimateAdmissions(tournament("B", 2), [
+      team("first", 100, 0),
+      team("second", 80, 0),
+      team("third", 60, 0),
+      team("fourth", 40, 0),
+    ]);
+
+    expect(estimate.allTeams.map((entry) => [entry.id, entry.predictedRank])).toEqual([
+      ["first", 1],
+      ["second", 2],
+      ["third", 3],
+      ["fourth", 4],
+    ]);
+  });
+
   it("separates unresolved teams", () => {
     const unresolved: RegisteredTeam = { ...team("bad", 0, 0), players: [] };
     const estimate = estimateAdmissions(tournament("B", 2), [team("good", 10, 0), unresolved]);

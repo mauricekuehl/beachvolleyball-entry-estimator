@@ -8,7 +8,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as { tournamentUrl?: unknown };
     if (typeof body.tournamentUrl !== "string") {
-      throw new EstimateError("tournamentUrl must be a string.", 400, "INVALID_BODY");
+      throw new EstimateError("Die Turnier-URL fehlt oder ist ungültig.", 400, "INVALID_BODY");
     }
 
     const { tournament, teams } = await scrapeBeachvolleyBb(body.tournamentUrl);
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     console.error(error);
     return Response.json(
       {
-        error: "The estimate failed while fetching or parsing public tournament data.",
+        error: "Die Schätzung ist beim Abrufen oder Auslesen der öffentlichen Turnierdaten fehlgeschlagen.",
         code: "ESTIMATE_FAILED",
       },
       { status: 500 },

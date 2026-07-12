@@ -16,10 +16,10 @@ export function parseGenderLabel(label: string): TournamentGender {
 }
 
 export function formatGenderLabel(gender: TournamentGender): string {
-  if (gender === "male") return "Men";
-  if (gender === "female") return "Women";
+  if (gender === "male") return "Männer";
+  if (gender === "female") return "Frauen";
   if (gender === "mixed") return "Mixed";
-  return "Unknown";
+  return "Unbekannt";
 }
 
 export function formatRawGenderLabel(label: string): string {

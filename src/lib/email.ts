@@ -31,7 +31,7 @@ export async function sendNewTournamentEmail({
     body: JSON.stringify({
       from: formatSender(),
       to: [email],
-      subject: `New ${genderLabel} ${tournament.categoryLabel || tournament.category} tournament published`,
+      subject: `Neues ${genderLabel}-${tournament.categoryLabel || tournament.category}-Turnier veröffentlicht`,
       html: buildHtmlContent(tournament, unsubscribeUrl),
       text: buildTextContent(tournament, unsubscribeUrl),
       headers: {
@@ -48,13 +48,13 @@ export async function sendNewTournamentEmail({
   return {
     ok: false,
     status: response.status,
-    error: await response.text().catch(() => "Resend request failed."),
+    error: await response.text().catch(() => "Resend-Anfrage fehlgeschlagen."),
   };
 }
 
 function formatSender(): string {
   const fromEmail = requireEnv("RESEND_FROM_EMAIL");
-  const fromName = process.env.RESEND_FROM_NAME?.trim() || "Beachvolleyball Entry Estimator";
+  const fromName = process.env.RESEND_FROM_NAME?.trim() || "Beachvolleyball-Zulassungsschätzung";
   return `${fromName} <${fromEmail}>`;
 }
 
@@ -62,17 +62,17 @@ function buildHtmlContent(tournament: PublishedTournament, unsubscribeUrl: strin
   const genderLabel = formatRawGenderLabel(tournament.gender);
 
   return `
-    <p>A new BeachvolleyBB tournament was published:</p>
+    <p>Ein neues BeachvolleyBB-Turnier wurde veröffentlicht:</p>
     <p>
       <strong>${escapeHtml(tournament.name)}</strong><br>
       ${escapeHtml(tournament.categoryLabel || tournament.category)}<br>
-      Gender: ${escapeHtml(genderLabel)}<br>
-      ${escapeHtml(tournament.date || "Date not listed")}<br>
-      ${escapeHtml(tournament.location || "Location not listed")}
+      Geschlecht: ${escapeHtml(genderLabel)}<br>
+      ${escapeHtml(tournament.date || "Datum nicht angegeben")}<br>
+      ${escapeHtml(tournament.location || "Ort nicht angegeben")}
     </p>
-    <p><a href="${escapeHtml(tournament.url)}">Open tournament</a></p>
+    <p><a href="${escapeHtml(tournament.url)}">Turnier öffnen</a></p>
     <p style="font-size:12px;color:#666">
-      <a href="${escapeHtml(unsubscribeUrl)}">Unsubscribe</a>
+      <a href="${escapeHtml(unsubscribeUrl)}">Abmelden</a>
     </p>
   `;
 }
@@ -81,17 +81,17 @@ function buildTextContent(tournament: PublishedTournament, unsubscribeUrl: strin
   const genderLabel = formatRawGenderLabel(tournament.gender);
 
   return [
-    "A new BeachvolleyBB tournament was published:",
+    "Ein neues BeachvolleyBB-Turnier wurde veröffentlicht:",
     "",
     tournament.name,
     tournament.categoryLabel || tournament.category,
-    `Gender: ${genderLabel}`,
-    tournament.date || "Date not listed",
-    tournament.location || "Location not listed",
+    `Geschlecht: ${genderLabel}`,
+    tournament.date || "Datum nicht angegeben",
+    tournament.location || "Ort nicht angegeben",
     "",
     tournament.url,
     "",
-    `Unsubscribe: ${unsubscribeUrl}`,
+    `Abmelden: ${unsubscribeUrl}`,
   ].join("\n");
 }
 

@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
     console.error(error);
     return Response.json(
-      { error: "Could not save the subscription.", code: "SUBSCRIPTION_FAILED" },
+      { error: "Das Abo konnte nicht gespeichert werden.", code: "SUBSCRIPTION_FAILED" },
       { status: 500 },
     );
   }

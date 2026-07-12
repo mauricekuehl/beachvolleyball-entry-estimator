@@ -10,7 +10,7 @@ export class ConfigurationError extends Error {
 export function requireEnv(name: string): string {
   const value = process.env[name]?.trim();
   if (!value) {
-    throw new ConfigurationError(`${name} is not configured.`, "MISSING_CONFIGURATION");
+    throw new ConfigurationError(`${name} ist nicht konfiguriert.`, "MISSING_CONFIGURATION");
   }
   return value;
 }

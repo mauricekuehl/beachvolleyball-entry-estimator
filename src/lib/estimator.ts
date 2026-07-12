@@ -16,7 +16,7 @@ type Rule = {
 export function estimateAdmissions(tournament: TournamentMetadata, teams: RegisteredTeam[]) {
   const rule = ruleForCategory(tournament.category);
   if (!rule) {
-    throw new EstimateError("Unsupported or unknown tournament category.", 422, "UNSUPPORTED_CATEGORY");
+    throw new EstimateError("Nicht unterstützte oder unbekannte Turnierkategorie.", 422, "UNSUPPORTED_CATEGORY");
   }
 
   const rankedTeams = teams.map(toEstimatedTeam);
@@ -64,7 +64,7 @@ export function estimateAdmissions(tournament: TournamentMetadata, teams: Regist
   const waitlist = eligible
     .filter((team) => !automaticIds.has(team.id))
     .toSorted(rule.inverseLv ? compareBy("LV", true) : compareBy("LV", false))
-    .map((team) => ({ ...team, status: "waitlist" as const, predictedRank: null }));
+    .map((team, index) => ({ ...team, status: "waitlist" as const, predictedRank: automatic.length + index + 1 }));
 
   return {
     ruleSummary: rule.summary,
@@ -80,25 +80,25 @@ export function ruleForCategory(category: TournamentCategory): Rule | null {
     case "Premium":
     case "A+":
       return {
-        summary: "Premium and A+ tournaments: 50% DVV ranking and 50% LV ranking.",
+        summary: "Premium- und A+-Turniere: 50 % DVV-Rangliste und 50 % LV-Rangliste.",
         dvvShare: 0.5,
         inverseLv: false,
       };
     case "A":
       return {
-        summary: "A tournaments: 25% DVV ranking and 75% LV ranking.",
+        summary: "A-Turniere: 25 % DVV-Rangliste und 75 % LV-Rangliste.",
         dvvShare: 0.25,
         inverseLv: false,
       };
     case "B":
       return {
-        summary: "B tournaments: 100% LV ranking.",
+        summary: "B-Turniere: 100 % LV-Rangliste.",
         dvvShare: 0,
         inverseLv: false,
       };
     case "C":
       return {
-        summary: "C tournaments: inverse LV ranking, so lower LV points are preferred.",
+        summary: "C-Turniere: inverse LV-Wertung, daher werden niedrigere LV-Punkte bevorzugt.",
         dvvShare: 0,
         inverseLv: true,
       };

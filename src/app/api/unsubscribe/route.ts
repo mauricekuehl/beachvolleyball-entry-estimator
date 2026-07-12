@@ -7,14 +7,14 @@ export async function GET(request: Request) {
   try {
     const token = new URL(request.url).searchParams.get("token") ?? "";
     const unsubscribed = await unsubscribeByToken(token);
-    const title = unsubscribed ? "Unsubscribed" : "Subscription not found";
+    const title = unsubscribed ? "Abgemeldet" : "Abo nicht gefunden";
     const message = unsubscribed
-      ? "You will no longer receive new BeachvolleyBB tournament emails."
-      : "This unsubscribe link is invalid or has already been used.";
+      ? "Du erhältst keine neuen BeachvolleyBB-Turnier-E-Mails mehr."
+      : "Dieser Abmeldelink ist ungültig oder wurde bereits verwendet.";
 
     return new Response(
       `<!doctype html>
-        <html lang="en">
+        <html lang="de">
           <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -36,6 +36,6 @@ export async function GET(request: Request) {
     }
 
     console.error(error);
-    return Response.json({ error: "Could not unsubscribe.", code: "UNSUBSCRIBE_FAILED" }, { status: 500 });
+    return Response.json({ error: "Die Abmeldung ist fehlgeschlagen.", code: "UNSUBSCRIBE_FAILED" }, { status: 500 });
   }
 }
