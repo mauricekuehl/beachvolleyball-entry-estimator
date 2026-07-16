@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
+import { Bell, Check, ExternalLink, Search, Share2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import type { EstimateResponse, EstimatedTeam, SubscriptionCategory, SubscriptionGender } from "@/lib/types";
 
@@ -34,13 +35,14 @@ export function EstimatorClient({ initialTournamentId }: { initialTournamentId?:
   const [selectedGender, setSelectedGender] = useState<SubscriptionGender>("male");
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>(null);
-  const [shareStatus, setShareStatus] = useState("");
+  const [shareStatus, setShareStatus] = useState<SubscriptionStatus>(null);
+  const [sharing, setSharing] = useState(false);
 
   const loadEstimate = useCallback(async (tournamentUrl: string) => {
     setLoading(true);
     setResult(null);
     setError(null);
-    setShareStatus("");
+    setShareStatus(null);
 
     try {
       const response = await fetch("/api/estimate", {
@@ -116,12 +118,12 @@ export function EstimatorClient({ initialTournamentId }: { initialTournamentId?:
 
       setSubscriptionStatus({
         kind: "success",
-        message: "Abo gespeichert.",
+        message: "Benachrichtigungen aktiviert.",
       });
     } catch {
       setSubscriptionStatus({
         kind: "error",
-        message: "Der Abo-Dienst konnte nicht erreicht werden.",
+        message: "Der Benachrichtigungsdienst konnte nicht erreicht werden.",
       });
     } finally {
       setSubscriptionLoading(false);
@@ -135,14 +137,18 @@ export function EstimatorClient({ initialTournamentId }: { initialTournamentId?:
   }
 
   async function copyShareLink() {
-    if (!result) return;
+    if (!result || sharing) return;
 
     const shareUrl = `${window.location.origin}${buildTournamentAppPath(result.tournament.id)}`;
+    setSharing(true);
+    setShareStatus(null);
     try {
       await copyToClipboard(shareUrl);
-      setShareStatus("Link kopiert.");
+      setShareStatus({ kind: "success", message: "Link kopiert" });
     } catch {
-      setShareStatus("Link konnte nicht kopiert werden.");
+      setShareStatus({ kind: "error", message: "Link konnte nicht kopiert werden" });
+    } finally {
+      setSharing(false);
     }
   }
 
@@ -153,14 +159,15 @@ export function EstimatorClient({ initialTournamentId }: { initialTournamentId?:
           <p className="eyebrow">Beach Tour Berlin-Brandenburg</p>
           <h1>Turnier-Tools</h1>
         </div>
-        <div className="mode-actions" aria-label="Tool auswählen">
+        <nav className="mode-actions" aria-label="Werkzeug auswählen">
           <button
             className={mode === "estimate" ? "active" : ""}
             type="button"
             aria-pressed={mode === "estimate"}
             onClick={() => setMode("estimate")}
           >
-            Zulassung schätzen
+            <Search aria-hidden="true" />
+            <span>Zulassung</span>
           </button>
           <button
             className={mode === "subscribe" ? "active" : ""}
@@ -168,27 +175,33 @@ export function EstimatorClient({ initialTournamentId }: { initialTournamentId?:
             aria-pressed={mode === "subscribe"}
             onClick={() => setMode("subscribe")}
           >
-            Neue Turniere abonnieren
+            <Bell aria-hidden="true" />
+            <span>Benachrichtigungen</span>
           </button>
-        </div>
+        </nav>
       </section>
 
       {mode === "estimate" ? (
         <>
           <form className="url-form" onSubmit={submit}>
+            <label className="visually-hidden" htmlFor="tournament-url">
+              BeachvolleyBB-Turnier-URL
+            </label>
             <input
-              aria-label="BeachvolleyBB-Turnier-URL"
+              id="tournament-url"
               value={url}
               onChange={(event) => setUrl(event.target.value)}
-              placeholder="https://www.beachvolleybb.de/cms/home/beachtour/erwachsene/turniere.xhtml?BeachTourneyComponent.tourneyId=..."
+              placeholder="https://www.beachvolleybb.de/…tourneyId=…"
+              inputMode="url"
+              autoComplete="url"
             />
-            <button type="submit" disabled={loading || !url.trim()}>
-              {loading ? "Wird geschätzt" : "Schätzen"}
+            <button type="submit" disabled={loading || !url.trim()} aria-busy={loading}>
+              {loading ? "Wird geschätzt …" : "Zulassung schätzen"}
             </button>
           </form>
 
           {error ? (
-            <section className="notice error">
+            <section className="notice error" role="alert">
               <strong>{error.error}</strong>
               <span>{error.code}</span>
             </section>
@@ -211,28 +224,32 @@ export function EstimatorClient({ initialTournamentId }: { initialTournamentId?:
               </section>
 
               <section className="result-actions" aria-label="Turnieraktionen">
-                <a className="external-link-button" href={result.tournament.url} target="_blank" rel="noreferrer">
-                  BVV Online öffnen
+                <a className="action-button external-link-button" href={result.tournament.url} target="_blank" rel="noreferrer">
+                  <ExternalLink aria-hidden="true" />
+                  <span>BVV öffnen</span>
                 </a>
-                <details className="share-menu">
-                  <summary aria-label="Teilen" title="Teilen">
-                    <ShareIcon />
-                  </summary>
-                  <div className="share-popover">
-                    <button type="button" onClick={copyShareLink}>
-                      Link kopieren
-                    </button>
-                    {shareStatus ? <span>{shareStatus}</span> : null}
-                  </div>
-                </details>
+                <div className="share-action">
+                  <button
+                    className="action-button share-button"
+                    type="button"
+                    onClick={copyShareLink}
+                    disabled={sharing}
+                    aria-busy={sharing}
+                  >
+                    <Share2 aria-hidden="true" />
+                    <span>{sharing ? "Wird kopiert …" : "Teilen"}</span>
+                  </button>
+                  <span
+                    className={`share-feedback ${shareStatus?.kind || ""}`}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {shareStatus?.message || ""}
+                  </span>
+                </div>
               </section>
 
-              <section className="table-section">
-                <div className="tabs" role="tablist" aria-label="Schätzansicht">
-                  <button className="active" type="button">
-                    Alle <span>{result.allTeams.length}</span>
-                  </button>
-                </div>
+              <section className="table-section" aria-label="Voraussichtliche Zulassungsreihenfolge">
                 <TeamTable teams={result.allTeams} showSourceBucket={shouldShowSourceBucket(result)} />
               </section>
             </>
@@ -246,62 +263,79 @@ export function EstimatorClient({ initialTournamentId }: { initialTournamentId?:
       ) : (
         <section className="subscribe-panel">
           <p className="subscribe-copy">
-            Sendet eine E-Mail, wenn neue Turniere in den ausgewählten Kategorien veröffentlicht werden.
+            Erhalte eine E-Mail, wenn neue Turniere in den ausgewählten Kategorien veröffentlicht werden.
           </p>
           <form className="subscribe-form" onSubmit={submitSubscription}>
-            <div className="field-group">
-              <span className="field-label">Geschlecht</span>
-              <div className="choice-list" role="radiogroup" aria-label="Turniergeschlecht">
-                {GENDER_OPTIONS.map((gender) => (
-                  <button
-                    key={gender.value}
-                    type="button"
-                    role="radio"
-                    className={`choice-row ${selectedGender === gender.value ? "active" : ""}`}
-                    aria-checked={selectedGender === gender.value}
-                    onClick={() => setSelectedGender(gender.value)}
-                  >
-                    <span>{gender.label}</span>
-                    <span className="radio-mark" aria-hidden="true" />
-                  </button>
-                ))}
+            <fieldset className="selection-group">
+              <legend>1. Turnierart</legend>
+              <div className="choice-list" role="radiogroup" aria-label="Turnierart">
+                {GENDER_OPTIONS.map((gender) => {
+                  const selected = selectedGender === gender.value;
+                  return (
+                    <button
+                      key={gender.value}
+                      type="button"
+                      role="radio"
+                      className={`selection-button ${selected ? "active" : ""}`}
+                      aria-checked={selected}
+                      onClick={() => setSelectedGender(gender.value)}
+                    >
+                      {selected ? <Check aria-hidden="true" /> : null}
+                      <span>{gender.label}</span>
+                    </button>
+                  );
+                })}
               </div>
-            </div>
-            <div className="field-group">
-              <span className="field-label">Kategorien</span>
+            </fieldset>
+
+            <fieldset className="selection-group">
+              <legend>2. Kategorien</legend>
               <div className="category-list" aria-label="Turnierkategorien">
-                {CATEGORY_OPTIONS.map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    className={`category-row ${selectedCategories.includes(category) ? "active" : ""}`}
-                    aria-pressed={selectedCategories.includes(category)}
-                    onClick={() => toggleCategory(category)}
-                  >
-                    <span>{category}</span>
-                    <span className="toggle-switch" aria-hidden="true">
-                      <span />
-                    </span>
-                  </button>
-                ))}
+                {CATEGORY_OPTIONS.map((category) => {
+                  const selected = selectedCategories.includes(category);
+                  return (
+                    <button
+                      key={category}
+                      type="button"
+                      className={`selection-button ${selected ? "active" : ""}`}
+                      aria-pressed={selected}
+                      onClick={() => toggleCategory(category)}
+                    >
+                      <span>{category}</span>
+                      {selected ? <Check aria-hidden="true" /> : null}
+                    </button>
+                  );
+                })}
               </div>
-            </div>
-            <div className="email-row">
-              <input
-                aria-label="E-Mail-Adresse"
-                type="email"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                placeholder="du@example.com"
-              />
-              <button type="submit" disabled={subscriptionLoading || !email.trim() || selectedCategories.length === 0}>
-                {subscriptionLoading ? "Wird gespeichert" : "Abonnieren"}
-              </button>
-            </div>
+            </fieldset>
+
+            <fieldset className="selection-group email-group">
+              <legend>3. E-Mail-Adresse</legend>
+              <div className="email-row">
+                <label className="visually-hidden" htmlFor="notification-email">
+                  E-Mail-Adresse
+                </label>
+                <input
+                  id="notification-email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="du@example.com"
+                  autoComplete="email"
+                />
+                <button
+                  type="submit"
+                  disabled={subscriptionLoading || !email.trim() || selectedCategories.length === 0}
+                  aria-busy={subscriptionLoading}
+                >
+                  {subscriptionLoading ? "Wird aktiviert …" : "Benachrichtigungen aktivieren"}
+                </button>
+              </div>
+            </fieldset>
           </form>
 
           {subscriptionStatus ? (
-            <section className={`notice ${subscriptionStatus.kind}`}>
+            <section className={`notice ${subscriptionStatus.kind}`} role="status">
               <strong>{subscriptionStatus.message}</strong>
             </section>
           ) : null}
@@ -319,16 +353,6 @@ function Metric({ label, value }: { label: string; value: string }) {
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
-  );
-}
-
-function ShareIcon() {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-      <path d="M15.5 5.5 12 2 8.5 5.5" />
-      <path d="M12 2v13" />
-      <path d="M6 10H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1" />
-    </svg>
   );
 }
 
@@ -426,8 +450,15 @@ function extractTournamentId(rawUrl: string): string | null {
 
 async function copyToClipboard(value: string): Promise<void> {
   if (navigator.clipboard) {
-    await navigator.clipboard.writeText(value);
-    return;
+    try {
+      await Promise.race([
+        navigator.clipboard.writeText(value),
+        new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("Clipboard timeout")), 1200)),
+      ]);
+      return;
+    } catch {
+      // Embedded browsers can expose the API without resolving it. Fall back to the selection-based copy below.
+    }
   }
 
   const textarea = document.createElement("textarea");
