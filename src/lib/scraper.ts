@@ -64,20 +64,11 @@ export function buildTournamentUrl(id: string, view: ViewName): string {
 export async function scrapeBeachvolleyBb(rawUrl: string, fetcher: Fetcher = fetchUncachedText) {
   const cachedFetcher = createCachedFetcher(fetcher);
   const { id, normalizedUrl } = parseTournamentUrl(rawUrl);
-  const [summaryHtml, detailsHtml, admissionsHtml, registrationsHtml] = await Promise.all([
+  const [summaryHtml, detailsHtml, admissionsHtml] = await Promise.all([
     cachedFetcher(buildTournamentUrl(id, "summary")),
     cachedFetcher(buildTournamentUrl(id, "details")),
     cachedFetcher(buildTournamentUrl(id, "admissions")),
-    cachedFetcher(buildTournamentUrl(id, "registrations")),
   ]);
-
-  if (isAdmissionPublished(admissionsHtml)) {
-    throw new EstimateError(
-      "Die Zulassungsliste ist bereits öffentlich verfügbar.",
-      409,
-      "ADMISSIONS_ALREADY_PUBLIC",
-    );
-  }
 
   const tournament = parseTournamentMetadata({
     id,
@@ -85,14 +76,23 @@ export async function scrapeBeachvolleyBb(rawUrl: string, fetcher: Fetcher = fet
     summaryHtml,
     detailsHtml,
   });
-  const registeredTeams = parseRegistrations(registrationsHtml);
+  const admissionsPublished = isAdmissionPublished(admissionsHtml);
+  const listedTeams = admissionsPublished
+    ? parseAdmissions(admissionsHtml)
+    : parseRegistrations(await cachedFetcher(buildTournamentUrl(id, "registrations")));
 
-  if (registeredTeams.length === 0) {
-    throw new EstimateError("Für dieses Turnier wurden keine öffentlichen Meldungen gefunden.", 404, "NO_REGISTRATIONS");
+  if (listedTeams.length === 0) {
+    throw new EstimateError(
+      admissionsPublished
+        ? "Die veröffentlichte Zulassungsliste konnte nicht ausgelesen werden."
+        : "Für dieses Turnier wurden keine öffentlichen Meldungen gefunden.",
+      admissionsPublished ? 502 : 404,
+      admissionsPublished ? "PARSE_ADMISSIONS" : "NO_REGISTRATIONS",
+    );
   }
 
-  const teams = await hydrateRegisteredTeams(registeredTeams, tournament, cachedFetcher);
-  return { tournament, teams };
+  const teams = await hydrateRegisteredTeams(listedTeams, tournament, cachedFetcher);
+  return { tournament, teams, admissionsPublished };
 }
 
 export async function scrapePublishedTournaments(fetcher: Fetcher = fetchUncachedText): Promise<PublishedTournament[]> {
@@ -205,6 +205,54 @@ export function parseRegistrations(html: string): RegisteredTeam[] {
       });
     });
   }
+
+  return teams;
+}
+
+export function parseAdmissions(html: string): RegisteredTeam[] {
+  const $ = cheerio.load(html);
+  const teams: RegisteredTeam[] = [];
+
+  $("table").each((_, table) => {
+    const headers = $(table)
+      .find("thead th")
+      .map((__, th) => normalizeLabel($(th).text()))
+      .get();
+    const rankIndex = headers.findIndex((header) => header === "#");
+    const teamIndex = headers.findIndex((header) => header === "mannschaft");
+    const clubIndex = headers.findIndex((header) => header === "verein");
+    const statusIndex = headers.findIndex((header) => header === "status");
+    const doubleRegistrationIndex = headers.findIndex((header) => header.includes("doppelmeldung"));
+    const detailsIndex = headers.findIndex((header) => header.includes("punkte") || header.includes("zulassung"));
+    if (teamIndex === -1 || statusIndex === -1) return;
+
+    $(table)
+      .find("tbody tr")
+      .each((__, row) => {
+        const cells = $(row).find("td");
+        const teamCell = cells.eq(teamIndex);
+        const link = teamCell.find("a[href*='beachTeamDetails.xhtml?beachTeamId=']").first();
+        const href = link.attr("href") ?? "";
+        const id = href.match(/beachTeamId=(\d+)/)?.[1];
+        if (!id) return;
+
+        teams.push({
+          id,
+          displayName: normalizeWhitespace(teamCell.text()),
+          club: clubIndex >= 0 ? normalizeWhitespace(cells.eq(clubIndex).text()) : "",
+          registeredAt: "",
+          players: [],
+          notes: [],
+          admission: {
+            rank: rankIndex >= 0 ? parseInteger(normalizeWhitespace(cells.eq(rankIndex).text())) : null,
+            status: normalizeWhitespace(cells.eq(statusIndex).text()),
+            doubleRegistration:
+              doubleRegistrationIndex >= 0 ? normalizeWhitespace(cells.eq(doubleRegistrationIndex).text()) : "",
+            details: detailsIndex >= 0 ? normalizeWhitespace(cells.eq(detailsIndex).text()) : "",
+          },
+        });
+      });
+  });
 
   return teams;
 }

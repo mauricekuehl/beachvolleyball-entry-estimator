@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseGenderLabel } from "../lib/gender";
 import {
   isAdmissionPublished,
+  parseAdmissions,
   parsePublishedTournaments,
   parsePlayerDetails,
   parseRankingRows,
@@ -73,6 +74,26 @@ describe("scraper parsers", () => {
       displayName: "B. Belkin / L. Rose",
       registeredAt: "23.06.2026, 20:12",
     });
+  });
+
+  it("parses the published Zulassung in its official order, including Nachrücker and Absagen", () => {
+    const teams = parseAdmissions(`
+      <table>
+        <thead><tr><th>#</th><th>Mannschaft</th><th>Verein</th><th>Status</th><th><span>Doppelmeldung</span><span>Doppelmeldung</span></th><th>Punkte / Zulassung</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td><a href="popup/beach/beachTeamDetails.xhtml?beachTeamId=1">A / B</a></td><td>Club</td><td>Hauptfeld</td><td>-</td><td>LV Männer (invers): 12</td></tr>
+          <tr><td>14</td><td><a href="popup/beach/beachTeamDetails.xhtml?beachTeamId=2">C / D</a></td><td>Club</td><td>Nachrücker</td><td>-</td><td>LV Männer: 55 Nachrücker</td></tr>
+          <tr><td></td><td><a href="popup/beach/beachTeamDetails.xhtml?beachTeamId=3">E / F</a></td><td>Club</td><td>Absage</td><td>Priorität 1</td><td></td></tr>
+        </tbody>
+      </table>`);
+
+    expect(teams.map((team) => [team.id, team.admission?.rank, team.admission?.status])).toEqual([
+      ["1", 1, "Hauptfeld"],
+      ["2", 14, "Nachrücker"],
+      ["3", null, "Absage"],
+    ]);
+    expect(teams[1].admission?.details).toBe("LV Männer: 55 Nachrücker");
+    expect(teams[2].admission?.doubleRegistration).toBe("Priorität 1");
   });
 
   it("parses team and player detail pages", () => {

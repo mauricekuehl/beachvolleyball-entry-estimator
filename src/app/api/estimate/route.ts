@@ -1,5 +1,5 @@
-import { estimateAdmissions } from "@/lib/estimator";
-import { scrapeBeachvolleyBb } from "@/lib/scraper";
+import { estimateAdmissions, presentPublishedAdmissions } from "@/lib/estimator";
+import { buildTournamentUrl, scrapeBeachvolleyBb } from "@/lib/scraper";
 import { EstimateError } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -11,16 +11,17 @@ export async function POST(request: Request) {
       throw new EstimateError("Die Turnier-URL fehlt oder ist ungültig.", 400, "INVALID_BODY");
     }
 
-    const { tournament, teams } = await scrapeBeachvolleyBb(body.tournamentUrl);
-    const estimate = estimateAdmissions(tournament, teams);
+    const { tournament, teams, admissionsPublished } = await scrapeBeachvolleyBb(body.tournamentUrl);
+    const estimate = admissionsPublished ? presentPublishedAdmissions(teams) : estimateAdmissions(tournament, teams);
 
     return Response.json({
       tournament,
+      admissionsPublished,
       ...estimate,
       dataSources: {
         fetchedAt: new Date().toISOString(),
-        registrationsUrl: body.tournamentUrl,
-        admissionsUrl: body.tournamentUrl.replace("registrations", "admissions"),
+        registrationsUrl: buildTournamentUrl(tournament.id, "registrations"),
+        admissionsUrl: buildTournamentUrl(tournament.id, "admissions"),
       },
     });
   } catch (error) {

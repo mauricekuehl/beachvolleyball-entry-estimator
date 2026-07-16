@@ -381,6 +381,28 @@ td span {
   margin-bottom: 12px;
 }
 
+.rule-panel.published {
+  border-color: #a9ccb8;
+  background: #f4fbf7;
+}
+
+.rule-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.official-label {
+  width: max-content;
+  border-radius: 999px;
+  background: var(--green-soft);
+  color: var(--green) !important;
+  font-size: 11px !important;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 4px 8px;
+  text-transform: uppercase;
+}
+
 .result-actions {
   display: flex;
   align-items: center;
@@ -527,6 +549,11 @@ tbody tr:hover {
 .status.unresolved {
   background: #fff1d5;
   color: var(--amber);
+}
+
+.status.cancelled {
+  background: #f4e4e4;
+  color: var(--red);
 }
 
 .player-links {
