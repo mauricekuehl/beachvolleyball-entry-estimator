@@ -3,7 +3,14 @@ export type SubscriptionCategory = Exclude<TournamentCategory, "Unknown">;
 export type TournamentGender = "male" | "female" | "mixed" | "unknown";
 export type SubscriptionGender = Exclude<TournamentGender, "unknown">;
 export type RankingSource = "DVV" | "LV";
-export type TeamStatus = "automatic" | "waitlist" | "unresolved";
+export type TeamStatus = "automatic" | "waitlist" | "cancelled" | "unresolved";
+
+export type PublishedAdmission = {
+  rank: number | null;
+  status: string;
+  doubleRegistration: string;
+  details: string;
+};
 
 export type TournamentMetadata = {
   id: string;
@@ -45,6 +52,7 @@ export type RegisteredTeam = {
   registeredAt: string;
   players: Player[];
   notes: string[];
+  admission?: PublishedAdmission;
 };
 
 export type EstimatedTeam = RegisteredTeam & {
@@ -57,9 +65,11 @@ export type EstimatedTeam = RegisteredTeam & {
 
 export type EstimateResponse = {
   tournament: TournamentMetadata;
+  admissionsPublished: boolean;
   ruleSummary: string;
   automatic: EstimatedTeam[];
   waitlist: EstimatedTeam[];
+  cancelled: EstimatedTeam[];
   unresolved: EstimatedTeam[];
   allTeams: EstimatedTeam[];
   dataSources: {

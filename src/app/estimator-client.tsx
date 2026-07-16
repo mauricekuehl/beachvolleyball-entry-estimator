@@ -196,7 +196,7 @@ export function EstimatorClient({ initialTournamentId }: { initialTournamentId?:
               autoComplete="url"
             />
             <button type="submit" disabled={loading || !url.trim()} aria-busy={loading}>
-              {loading ? "Wird geschätzt …" : "Zulassung schätzen"}
+              {loading ? "Wird geladen …" : "Zulassung laden"}
             </button>
           </form>
 
@@ -213,13 +213,24 @@ export function EstimatorClient({ initialTournamentId }: { initialTournamentId?:
                 <Metric label="Turnier" value={result.tournament.name} />
                 <Metric label="Kategorie" value={result.tournament.categoryLabel || result.tournament.category} />
                 <Metric label="Datum" value={result.tournament.date || "Unbekannt"} />
-                <Metric label="Zulassungsplätze" value={String(result.tournament.automaticCapacity)} />
+                <Metric
+                  label={result.admissionsPublished ? "Hauptfeldteams" : "Zulassungsplätze"}
+                  value={String(
+                    result.admissionsPublished ? result.tournament.mainDrawTeams : result.tournament.automaticCapacity,
+                  )}
+                />
                 <Metric label="Wildcards" value={String(result.tournament.wildcardMainDraw)} />
-                <Metric label="Meldungen" value={String(result.allTeams.length)} />
+                <Metric
+                  label={result.admissionsPublished ? "Listeneinträge" : "Meldungen"}
+                  value={String(result.allTeams.length)}
+                />
               </section>
 
-              <section className="rule-panel">
-                <strong>{result.ruleSummary}</strong>
+              <section className={`rule-panel ${result.admissionsPublished ? "published" : ""}`}>
+                <div className="rule-copy">
+                  {result.admissionsPublished ? <span className="official-label">Offizielle Zulassung</span> : null}
+                  <strong>{result.ruleSummary}</strong>
+                </div>
                 <span>Abgerufen: {new Date(result.dataSources.fetchedAt).toLocaleString("de-DE")}</span>
               </section>
 
@@ -249,14 +260,25 @@ export function EstimatorClient({ initialTournamentId }: { initialTournamentId?:
                 </div>
               </section>
 
-              <section className="table-section" aria-label="Voraussichtliche Zulassungsreihenfolge">
-                <TeamTable teams={result.allTeams} showSourceBucket={shouldShowSourceBucket(result)} />
+              <section
+                className="table-section"
+                aria-label={
+                  result.admissionsPublished
+                    ? "Veröffentlichte Zulassungsreihenfolge"
+                    : "Voraussichtliche Zulassungsreihenfolge"
+                }
+              >
+                <TeamTable
+                  teams={result.allTeams}
+                  published={result.admissionsPublished}
+                  showSourceBucket={shouldShowSourceBucket(result)}
+                />
               </section>
             </>
           ) : (
             <section className="empty-state">
-              Füge einen öffentlichen Erwachsenen-Turnierlink von beachvolleybb.de ein, um die Zulassung aus den
-              Meldungen zu schätzen.
+              Füge einen öffentlichen Erwachsenen-Turnierlink von beachvolleybb.de ein, um die Zulassung zu schätzen
+              oder eine veröffentlichte Liste mit aktuellen Spielerpunkten anzuzeigen.
             </section>
           )}
         </>
@@ -356,7 +378,15 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
-function TeamTable({ teams, showSourceBucket }: { teams: EstimatedTeam[]; showSourceBucket: boolean }) {
+function TeamTable({
+  teams,
+  published,
+  showSourceBucket,
+}: {
+  teams: EstimatedTeam[];
+  published: boolean;
+  showSourceBucket: boolean;
+}) {
   if (teams.length === 0) {
     return <div className="no-rows">Keine Teams in dieser Ansicht.</div>;
   }
@@ -369,17 +399,21 @@ function TeamTable({ teams, showSourceBucket }: { teams: EstimatedTeam[]; showSo
             <th>Status</th>
             <th>Rang</th>
             <th>Team</th>
-            <th>LV</th>
-            <th>DVV</th>
-            {showSourceBucket ? <th>Wertung</th> : null}
-            <th>Angemeldet</th>
+            <th>{published ? "LV aktuell" : "LV"}</th>
+            <th>{published ? "DVV aktuell" : "DVV"}</th>
+            {published ? <th>Doppelmeldung</th> : null}
+            {published ? <th>Punkte / Zulassung damals</th> : null}
+            {!published && showSourceBucket ? <th>Wertung</th> : null}
+            {!published ? <th>Angemeldet</th> : null}
           </tr>
         </thead>
         <tbody>
           {teams.map((team) => (
             <tr key={team.id}>
               <td data-label="Status">
-                <span className={`status ${team.status}`}>{formatStatus(team.status)}</span>
+                <span className={`status ${team.status}`}>
+                  {published && team.admission?.status ? team.admission.status : formatStatus(team.status)}
+                </span>
               </td>
               <td data-label="Rang">{team.predictedRank ?? "-"}</td>
               <td data-label="Team">
@@ -411,8 +445,14 @@ function TeamTable({ teams, showSourceBucket }: { teams: EstimatedTeam[]; showSo
               </td>
               <td data-label="LV">{team.lvPoints}</td>
               <td data-label="DVV">{team.dvvPoints}</td>
-              {showSourceBucket ? <td data-label="Wertung">{formatSourceBucket(team.sourceBucket)}</td> : null}
-              <td data-label="Angemeldet">{team.registeredAt || "-"}</td>
+              {published ? <td data-label="Doppelmeldung">{team.admission?.doubleRegistration || "-"}</td> : null}
+              {published ? (
+                <td data-label="Punkte / Zulassung damals">{team.admission?.details || "-"}</td>
+              ) : null}
+              {!published && showSourceBucket ? (
+                <td data-label="Wertung">{formatSourceBucket(team.sourceBucket)}</td>
+              ) : null}
+              {!published ? <td data-label="Angemeldet">{team.registeredAt || "-"}</td> : null}
             </tr>
           ))}
         </tbody>
@@ -483,6 +523,8 @@ function formatStatus(status: EstimatedTeam["status"]): string {
       return "Zugelassen";
     case "waitlist":
       return "Warteliste";
+    case "cancelled":
+      return "Absage";
     case "unresolved":
       return "Ungeklärt";
   }

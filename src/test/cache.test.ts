@@ -22,6 +22,31 @@ describe("external HTML cache", () => {
     await scrapeBeachvolleyBb(tournamentUrl, fetcher);
     expect(calls).toHaveLength(7);
   });
+
+  it("hydrates a published admission list without fetching registrations", async () => {
+    const calls: string[] = [];
+    const fetcher = async (url: string) => {
+      calls.push(url);
+      if (url.includes("BeachTourneyComponent.view=admissions")) {
+        return `
+          <table>
+            <thead><tr><th>#</th><th>Mannschaft</th><th>Verein</th><th>Status</th><th>Doppelmeldung</th><th>Punkte / Zulassung</th></tr></thead>
+            <tbody><tr>
+              <td>14</td>
+              <td><a href="popup/beach/beachTeamDetails.xhtml?beachTeamId=1">A. One / B. Two</a></td>
+              <td>Club</td><td>Nachrücker</td><td>-</td><td>LV Männer: 120 Nachrücker</td>
+            </tr></tbody>
+          </table>`;
+      }
+      return htmlFor(url);
+    };
+
+    const result = await scrapeBeachvolleyBb(tournamentUrl, fetcher);
+
+    expect(result.admissionsPublished).toBe(true);
+    expect(result.teams[0].admission).toMatchObject({ rank: 14, status: "Nachrücker" });
+    expect(calls.some((url) => url.includes("BeachTourneyComponent.view=registrations"))).toBe(false);
+  });
 });
 
 function htmlFor(url: string): string {

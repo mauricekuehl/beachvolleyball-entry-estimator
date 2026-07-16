@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estimateAdmissions } from "../lib/estimator";
+import { estimateAdmissions, presentPublishedAdmissions } from "../lib/estimator";
 import type { Player, RegisteredTeam, TournamentMetadata } from "../lib/types";
 
 function player(name: string, lv: number, dvv: number): Player {
@@ -118,5 +118,22 @@ describe("estimateAdmissions", () => {
     expect(estimate.automatic.map((entry) => entry.id)).toEqual(["partial", "full"]);
     expect(estimate.automatic[0].notes).toContain("partial A: no matching DVV ranking found.");
     expect(estimate.automatic[0].notes).toContain("partial B: no matching BB ranking found.");
+  });
+
+  it("keeps the published order and statuses while using current profile points", () => {
+    const published = [
+      { ...team("admitted", 220, 12), admission: { rank: 1, status: "Hauptfeld", doubleRegistration: "-", details: "LV Männer: 90" } },
+      { ...team("waitlist", 300, 15), admission: { rank: 14, status: "Nachrücker", doubleRegistration: "-", details: "LV Männer: 80 Nachrücker" } },
+      { ...team("withdrawn", 400, 20), admission: { rank: null, status: "Absage", doubleRegistration: "-", details: "" } },
+    ];
+
+    const result = presentPublishedAdmissions(published);
+
+    expect(result.allTeams.map((entry) => [entry.id, entry.predictedRank, entry.lvPoints, entry.status])).toEqual([
+      ["admitted", 1, 220, "automatic"],
+      ["waitlist", 14, 300, "waitlist"],
+      ["withdrawn", null, 400, "cancelled"],
+    ]);
+    expect(result.cancelled.map((entry) => entry.id)).toEqual(["withdrawn"]);
   });
 });

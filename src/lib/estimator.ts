@@ -70,8 +70,38 @@ export function estimateAdmissions(tournament: TournamentMetadata, teams: Regist
     ruleSummary: rule.summary,
     automatic,
     waitlist,
+    cancelled: [],
     unresolved,
     allTeams: [...automatic, ...waitlist, ...unresolved],
+  };
+}
+
+export function presentPublishedAdmissions(teams: RegisteredTeam[]) {
+  const allTeams = teams.map((team) => {
+    const estimated = toEstimatedTeam(team);
+    const admission = team.admission;
+    const status = admission ? publishedStatus(admission.status) : "unresolved";
+
+    return {
+      ...estimated,
+      status,
+      predictedRank: admission?.rank ?? null,
+      sourceBucket: publishedSource(admission?.details ?? "", estimated.sourceBucket),
+    };
+  });
+  const automatic = allTeams.filter((team) => team.status === "automatic");
+  const waitlist = allTeams.filter((team) => team.status === "waitlist");
+  const cancelled = allTeams.filter((team) => team.status === "cancelled");
+  const unresolved = allTeams.filter((team) => team.status === "unresolved");
+
+  return {
+    ruleSummary:
+      "Reihenfolge und Status stammen aus der veröffentlichten Zulassung. Die LV- und DVV-Punkte werden aktuell aus den öffentlichen Spielerprofilen berechnet.",
+    automatic,
+    waitlist,
+    cancelled,
+    unresolved,
+    allTeams,
   };
 }
 
@@ -177,4 +207,23 @@ function parseRegistrationTime(value: string): number {
   if (!match) return Number.MAX_SAFE_INTEGER;
   const [, day, month, year, hour = "0", minute = "0"] = match;
   return Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
+}
+
+function publishedStatus(status: string): EstimatedTeam["status"] {
+  const normalized = status.toLowerCase();
+  if (normalized.includes("hauptfeld") || normalized.includes("qualifikation")) return "automatic";
+  if (normalized.includes("nachrück")) return "waitlist";
+  if (normalized.includes("absage") || normalized.includes("abgemeldet")) return "cancelled";
+  return "unresolved";
+}
+
+function publishedSource(
+  details: string,
+  fallback: EstimatedTeam["sourceBucket"],
+): EstimatedTeam["sourceBucket"] {
+  const normalized = details.toLowerCase();
+  if (normalized.includes("invers")) return "INVERSE_LV";
+  if (normalized.includes("dvv")) return "DVV";
+  if (normalized.includes("lv")) return "LV";
+  return fallback;
 }
