@@ -1,33 +1,17 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import Link from "next/link";
+import { Bell, Check, ExternalLink, Search, Share2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import {
-  ArrowRight,
-  Bell,
-  CalendarDays,
-  Check,
-  ChevronRight,
-  CircleHelp,
-  ClipboardPaste,
-  ExternalLink,
-  Link2,
-  Mail,
-  Menu,
-  Search,
-  Share2,
-  Sparkles,
-  Trophy,
-  Users,
-  X,
-} from "lucide-react";
 import type { EstimateResponse, EstimatedTeam, SubscriptionCategory, SubscriptionGender } from "@/lib/types";
 
-type ApiError = { error: string; code: string };
+type ApiError = {
+  error: string;
+  code: string;
+};
+
 type Mode = "estimate" | "subscribe";
 type SubscriptionStatus = { kind: "success" | "error"; message: string } | null;
-export type DesignVariant = "v1" | "v2" | "v3" | "v4" | "v5";
 
 const CATEGORY_OPTIONS = ["Premium", "A+", "A", "B", "C"] as const satisfies readonly SubscriptionCategory[];
 const GENDER_OPTIONS = [
@@ -35,24 +19,10 @@ const GENDER_OPTIONS = [
   { value: "female", label: "Frauen" },
   { value: "mixed", label: "Mixed" },
 ] as const satisfies readonly { value: SubscriptionGender; label: string }[];
-const VERSIONS: DesignVariant[] = ["v1", "v2", "v3", "v4", "v5"];
+
 const BEACHVOLLEYBB_TOURNAMENT_PATH = "/cms/home/beachtour/erwachsene/turniere.xhtml";
 
-const VERSION_COPY: Record<DesignVariant, { name: string; hint: string }> = {
-  v1: { name: "Klar", hint: "Reduziert auf das Wesentliche" },
-  v2: { name: "Fokus", hint: "Suche zuerst, Details danach" },
-  v3: { name: "Zentrale", hint: "Alle Werkzeuge im Blick" },
-  v4: { name: "Geführt", hint: "In drei Schritten zum Ergebnis" },
-  v5: { name: "Spielfeld", hint: "Expressiv und direkt" },
-};
-
-export function EstimatorClient({
-  initialTournamentId,
-  variant = "v1",
-}: {
-  initialTournamentId?: string;
-  variant?: DesignVariant;
-}) {
+export function EstimatorClient({ initialTournamentId }: { initialTournamentId?: string }) {
   const router = useRouter();
   const initialTournamentUrl = initialTournamentId ? buildBeachvolleyBbTournamentUrl(initialTournamentId) : "";
   const [mode, setMode] = useState<Mode>("estimate");
@@ -65,14 +35,14 @@ export function EstimatorClient({
   const [selectedGender, setSelectedGender] = useState<SubscriptionGender>("male");
   const [subscriptionLoading, setSubscriptionLoading] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>(null);
-  const [shareStatus, setShareStatus] = useState("");
-  const [versionMenuOpen, setVersionMenuOpen] = useState(false);
+  const [shareStatus, setShareStatus] = useState<SubscriptionStatus>(null);
+  const [sharing, setSharing] = useState(false);
 
   const loadEstimate = useCallback(async (tournamentUrl: string) => {
     setLoading(true);
     setResult(null);
     setError(null);
-    setShareStatus("");
+    setShareStatus(null);
 
     try {
       const response = await fetch("/api/estimate", {
@@ -89,7 +59,10 @@ export function EstimatorClient({
 
       setResult(payload as EstimateResponse);
     } catch {
-      setError({ error: "Die Schätzung konnte nicht erreicht werden.", code: "NETWORK_ERROR" });
+      setError({
+        error: "Die Schätzung konnte nicht erreicht werden.",
+        code: "NETWORK_ERROR",
+      });
     } finally {
       setLoading(false);
     }
@@ -97,30 +70,29 @@ export function EstimatorClient({
 
   useEffect(() => {
     if (!initialTournamentId) return;
-    const timer = window.setTimeout(() => void loadEstimate(buildBeachvolleyBbTournamentUrl(initialTournamentId)), 0);
+
+    const timer = window.setTimeout(() => {
+      void loadEstimate(buildBeachvolleyBbTournamentUrl(initialTournamentId));
+    }, 0);
+
     return () => window.clearTimeout(timer);
   }, [initialTournamentId, loadEstimate]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const tournamentId = extractTournamentId(url);
+
     if (!tournamentId) {
-      setError({ error: "Füge einen gültigen BeachvolleyBB-Turnierlink ein.", code: "LINK_PRÜFEN" });
+      setError({
+        error: "Die URL muss eine BeachvolleyBB-Turnier-ID enthalten.",
+        code: "MISSING_TOURNEY_ID",
+      });
       return;
     }
 
     setError(null);
     setResult(null);
-    router.replace(buildVersionPath(variant, tournamentId));
-  }
-
-  async function pasteLink() {
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text) setUrl(text);
-    } catch {
-      setError({ error: "Der Browser hat keinen Zugriff auf die Zwischenablage.", code: "MANUELL_EINFÜGEN" });
-    }
+    router.replace(buildTournamentAppPath(tournamentId));
   }
 
   async function submitSubscription(event: FormEvent<HTMLFormElement>) {
@@ -135,13 +107,24 @@ export function EstimatorClient({
         body: JSON.stringify({ email, categories: selectedCategories, gender: selectedGender }),
       });
       const payload = (await response.json()) as { ok?: boolean; error?: string };
+
       if (!response.ok) {
-        setSubscriptionStatus({ kind: "error", message: payload.error || "Das Abo konnte nicht gespeichert werden." });
+        setSubscriptionStatus({
+          kind: "error",
+          message: payload.error || "Das Abo konnte nicht gespeichert werden.",
+        });
         return;
       }
-      setSubscriptionStatus({ kind: "success", message: "Abo gespeichert. Du verpasst kein neues Turnier." });
+
+      setSubscriptionStatus({
+        kind: "success",
+        message: "Benachrichtigungen aktiviert.",
+      });
     } catch {
-      setSubscriptionStatus({ kind: "error", message: "Der Abo-Dienst konnte nicht erreicht werden." });
+      setSubscriptionStatus({
+        kind: "error",
+        message: "Der Benachrichtigungsdienst konnte nicht erreicht werden.",
+      });
     } finally {
       setSubscriptionLoading(false);
     }
@@ -154,281 +137,282 @@ export function EstimatorClient({
   }
 
   async function copyShareLink() {
-    if (!result) return;
-    const shareUrl = `${window.location.origin}${buildVersionPath(variant, result.tournament.id)}`;
+    if (!result || sharing) return;
+
+    const shareUrl = `${window.location.origin}${buildTournamentAppPath(result.tournament.id)}`;
+    setSharing(true);
+    setShareStatus(null);
     try {
       await copyToClipboard(shareUrl);
-      setShareStatus("Link kopiert");
+      setShareStatus({ kind: "success", message: "Link kopiert" });
     } catch {
-      setShareStatus("Kopieren fehlgeschlagen");
+      setShareStatus({ kind: "error", message: "Link konnte nicht kopiert werden" });
+    } finally {
+      setSharing(false);
     }
   }
 
-  const versionCopy = VERSION_COPY[variant];
-
   return (
-    <main className={`product-shell product-${variant} mode-${mode}`}>
-      <div className="court-decoration" aria-hidden="true"><span /><span /><span /></div>
-
-      <header className="topbar">
-        <Link className="brand" href="/" aria-label="Zur Versionsauswahl">
-          <span className="brand-mark" aria-hidden="true"><span /></span>
-          <span className="brand-copy"><strong>Sideout</strong><small>BB Turnier-Tools</small></span>
-        </Link>
-        <div className="topbar-context">
-          <span>{versionCopy.name}</span>
-          <small>{versionCopy.hint}</small>
+    <main className="shell">
+      <section className="intro">
+        <div>
+          <p className="eyebrow">Beach Tour Berlin-Brandenburg</p>
+          <h1>Turnier-Tools</h1>
         </div>
-        <nav className={`version-switcher ${versionMenuOpen ? "open" : ""}`} aria-label="Designversion wählen">
-          {VERSIONS.map((version) => (
-            <a key={version} href={`/${version}`} aria-current={version === variant ? "page" : undefined}>
-              <span>{version.slice(1)}</span><small>{VERSION_COPY[version].name}</small>
-            </a>
-          ))}
+        <nav className="mode-actions" aria-label="Werkzeug auswählen">
+          <button
+            className={mode === "estimate" ? "active" : ""}
+            type="button"
+            aria-pressed={mode === "estimate"}
+            onClick={() => setMode("estimate")}
+          >
+            <Search aria-hidden="true" />
+            <span>Zulassung</span>
+          </button>
+          <button
+            className={mode === "subscribe" ? "active" : ""}
+            type="button"
+            aria-pressed={mode === "subscribe"}
+            onClick={() => setMode("subscribe")}
+          >
+            <Bell aria-hidden="true" />
+            <span>Benachrichtigungen</span>
+          </button>
         </nav>
-        <button
-          className="icon-button mobile-menu"
-          type="button"
-          aria-label={versionMenuOpen ? "Navigation schließen" : "Navigation öffnen"}
-          aria-expanded={versionMenuOpen}
-          onClick={() => setVersionMenuOpen((open) => !open)}
-          title={versionMenuOpen ? "Navigation schließen" : "Navigation öffnen"}
-        >
-          {versionMenuOpen ? <X aria-hidden="true" /> : <Menu aria-hidden="true" />}
-        </button>
-      </header>
+      </section>
 
-      <div className="app-frame">
-        <aside className="tool-rail" aria-label="Werkzeuge">
-          <div className="rail-label">Werkzeuge</div>
-          <button className={mode === "estimate" ? "active" : ""} type="button" onClick={() => setMode("estimate")}>
-            <Search aria-hidden="true" /><span><strong>Zulassung</strong><small>Chancen schätzen</small></span><ChevronRight aria-hidden="true" />
-          </button>
-          <button className={mode === "subscribe" ? "active" : ""} type="button" onClick={() => setMode("subscribe")}>
-            <Bell aria-hidden="true" /><span><strong>Turnieralarm</strong><small>Neue Termine erhalten</small></span><ChevronRight aria-hidden="true" />
-          </button>
-          <div className="rail-tip">
-            <CircleHelp aria-hidden="true" />
-            <span><strong>Wo ist der Link?</strong><small>Öffne beim BVV die Meldeliste und kopiere die Adresse.</small></span>
-          </div>
-        </aside>
-
-        <section className="workspace">
-          <div className="mode-switch" aria-label="Werkzeug auswählen">
-            <button type="button" className={mode === "estimate" ? "active" : ""} aria-pressed={mode === "estimate"} onClick={() => setMode("estimate")}>
-              <Search aria-hidden="true" /> Zulassung
+      {mode === "estimate" ? (
+        <>
+          <form className="url-form" onSubmit={submit}>
+            <label className="visually-hidden" htmlFor="tournament-url">
+              BeachvolleyBB-Turnier-URL
+            </label>
+            <input
+              id="tournament-url"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              placeholder="https://www.beachvolleybb.de/…tourneyId=…"
+              inputMode="url"
+              autoComplete="url"
+            />
+            <button type="submit" disabled={loading || !url.trim()} aria-busy={loading}>
+              {loading ? "Wird geschätzt …" : "Zulassung schätzen"}
             </button>
-            <button type="button" className={mode === "subscribe" ? "active" : ""} aria-pressed={mode === "subscribe"} onClick={() => setMode("subscribe")}>
-              <Bell aria-hidden="true" /> Turnieralarm
-            </button>
-          </div>
+          </form>
 
-          {mode === "estimate" ? (
+          {error ? (
+            <section className="notice error" role="alert">
+              <strong>{error.error}</strong>
+              <span>{error.code}</span>
+            </section>
+          ) : null}
+
+          {result ? (
             <>
-              <section className="task-header">
-                <div>
-                  <p className="section-kicker"><Sparkles aria-hidden="true" /> Zulassungsschätzung</p>
-                  <h1>Kommt euer Team ins Feld?</h1>
-                  <p>Turnierlink einfügen. Wir ordnen die Meldeliste nach den aktuellen Zulassungsregeln.</p>
-                </div>
-                <div className="step-track" aria-label="Ablauf">
-                  <span className="current"><b>1</b> Link</span><i /><span className={loading || result ? "current" : ""}><b>2</b> Prüfen</span><i /><span className={result ? "current" : ""}><b>3</b> Ergebnis</span>
+              <section className="summary-grid" aria-label="Turnierübersicht">
+                <Metric label="Turnier" value={result.tournament.name} />
+                <Metric label="Kategorie" value={result.tournament.categoryLabel || result.tournament.category} />
+                <Metric label="Datum" value={result.tournament.date || "Unbekannt"} />
+                <Metric label="Zulassungsplätze" value={String(result.tournament.automaticCapacity)} />
+                <Metric label="Wildcards" value={String(result.tournament.wildcardMainDraw)} />
+                <Metric label="Meldungen" value={String(result.allTeams.length)} />
+              </section>
+
+              <section className="rule-panel">
+                <strong>{result.ruleSummary}</strong>
+                <span>Abgerufen: {new Date(result.dataSources.fetchedAt).toLocaleString("de-DE")}</span>
+              </section>
+
+              <section className="result-actions" aria-label="Turnieraktionen">
+                <a className="action-button external-link-button" href={result.tournament.url} target="_blank" rel="noreferrer">
+                  <ExternalLink aria-hidden="true" />
+                  <span>BVV öffnen</span>
+                </a>
+                <div className="share-action">
+                  <button
+                    className="action-button share-button"
+                    type="button"
+                    onClick={copyShareLink}
+                    disabled={sharing}
+                    aria-busy={sharing}
+                  >
+                    <Share2 aria-hidden="true" />
+                    <span>{sharing ? "Wird kopiert …" : "Teilen"}</span>
+                  </button>
+                  <span
+                    className={`share-feedback ${shareStatus?.kind || ""}`}
+                    role="status"
+                    aria-live="polite"
+                  >
+                    {shareStatus?.message || ""}
+                  </span>
                 </div>
               </section>
 
-              <form className="estimate-form" onSubmit={submit}>
-                <label htmlFor={`tournament-url-${variant}`}>BeachvolleyBB-Turnierlink</label>
-                <div className="input-cluster">
-                  <Link2 className="input-icon" aria-hidden="true" />
-                  <input
-                    id={`tournament-url-${variant}`}
-                    value={url}
-                    onChange={(event) => setUrl(event.target.value)}
-                    placeholder="Turnierlink hier einfügen …"
-                    autoComplete="url"
-                    inputMode="url"
-                  />
-                  <button className="paste-button" type="button" onClick={pasteLink} title="Aus Zwischenablage einfügen">
-                    <ClipboardPaste aria-hidden="true" /><span>Einfügen</span>
-                  </button>
-                  <button className="primary-action" type="submit" disabled={loading || !url.trim()}>
-                    <span>{loading ? "Wird geprüft …" : "Jetzt schätzen"}</span><ArrowRight aria-hidden="true" />
-                  </button>
-                </div>
-                <small>Funktioniert mit öffentlichen Erwachsenen-Turnieren auf beachvolleybb.de</small>
-              </form>
-
-              {error ? <Notice kind="error" title={error.error} detail={error.code} /> : null}
-              {loading ? <LoadingState /> : null}
-              {result ? <EstimateResult result={result} shareStatus={shareStatus} copyShareLink={copyShareLink} /> : null}
-              {!result && !loading ? <EstimateEmptyState variant={variant} /> : null}
+              <section className="table-section" aria-label="Voraussichtliche Zulassungsreihenfolge">
+                <TeamTable teams={result.allTeams} showSourceBucket={shouldShowSourceBucket(result)} />
+              </section>
             </>
           ) : (
-            <SubscriptionPanel
-              email={email}
-              setEmail={setEmail}
-              selectedCategories={selectedCategories}
-              selectedGender={selectedGender}
-              toggleCategory={toggleCategory}
-              setSelectedGender={setSelectedGender}
-              submitSubscription={submitSubscription}
-              loading={subscriptionLoading}
-              status={subscriptionStatus}
-            />
+            <section className="empty-state">
+              Füge einen öffentlichen Erwachsenen-Turnierlink von beachvolleybb.de ein, um die Zulassung aus den
+              Meldungen zu schätzen.
+            </section>
           )}
+        </>
+      ) : (
+        <section className="subscribe-panel">
+          <p className="subscribe-copy">
+            Erhalte eine E-Mail, wenn neue Turniere in den ausgewählten Kategorien veröffentlicht werden.
+          </p>
+          <form className="subscribe-form" onSubmit={submitSubscription}>
+            <fieldset className="selection-group">
+              <legend>1. Turnierart</legend>
+              <div className="choice-list" role="radiogroup" aria-label="Turnierart">
+                {GENDER_OPTIONS.map((gender) => {
+                  const selected = selectedGender === gender.value;
+                  return (
+                    <button
+                      key={gender.value}
+                      type="button"
+                      role="radio"
+                      className={`selection-button ${selected ? "active" : ""}`}
+                      aria-checked={selected}
+                      onClick={() => setSelectedGender(gender.value)}
+                    >
+                      {selected ? <Check aria-hidden="true" /> : null}
+                      <span>{gender.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            <fieldset className="selection-group">
+              <legend>2. Kategorien</legend>
+              <div className="category-list" aria-label="Turnierkategorien">
+                {CATEGORY_OPTIONS.map((category) => {
+                  const selected = selectedCategories.includes(category);
+                  return (
+                    <button
+                      key={category}
+                      type="button"
+                      className={`selection-button ${selected ? "active" : ""}`}
+                      aria-pressed={selected}
+                      onClick={() => toggleCategory(category)}
+                    >
+                      <span>{category}</span>
+                      {selected ? <Check aria-hidden="true" /> : null}
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+
+            <fieldset className="selection-group email-group">
+              <legend>3. E-Mail-Adresse</legend>
+              <div className="email-row">
+                <label className="visually-hidden" htmlFor="notification-email">
+                  E-Mail-Adresse
+                </label>
+                <input
+                  id="notification-email"
+                  type="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="du@example.com"
+                  autoComplete="email"
+                />
+                <button
+                  type="submit"
+                  disabled={subscriptionLoading || !email.trim() || selectedCategories.length === 0}
+                  aria-busy={subscriptionLoading}
+                >
+                  {subscriptionLoading ? "Wird aktiviert …" : "Benachrichtigungen aktivieren"}
+                </button>
+              </div>
+            </fieldset>
+          </form>
+
+          {subscriptionStatus ? (
+            <section className={`notice ${subscriptionStatus.kind}`} role="status">
+              <strong>{subscriptionStatus.message}</strong>
+            </section>
+          ) : null}
         </section>
-      </div>
+      )}
 
-      <nav className="bottom-dock" aria-label="Werkzeuge">
-        <button className={mode === "estimate" ? "active" : ""} type="button" onClick={() => setMode("estimate")}><Search aria-hidden="true" /><span>Schätzen</span></button>
-        <button className={mode === "subscribe" ? "active" : ""} type="button" onClick={() => setMode("subscribe")}><Bell aria-hidden="true" /><span>Alarm</span></button>
-        <Link href="/" aria-label="Version wechseln"><Menu aria-hidden="true" /><span>Versionen</span></Link>
-      </nav>
-
-      <footer><span>Sideout ist ein unabhängiges Tool.</span><a href="mailto:main@mauricekuehl.com">Feedback senden</a></footer>
+      <footer className="contact-note">Kontakt: main@mauricekuehl.com</footer>
     </main>
   );
 }
 
-function EstimateEmptyState({ variant }: { variant: DesignVariant }) {
+function Metric({ label, value }: { label: string; value: string }) {
   return (
-    <section className="empty-guide">
-      <div className="empty-visual" aria-hidden="true"><span>1</span><i /><span>2</span><i /><span><Check /></span></div>
-      <div><strong>Noch keine Schätzung</strong><p>Ein Turnierlink genügt. Namen, Punkte und Meldestand lesen wir automatisch aus.</p></div>
-      <a href="https://www.beachvolleybb.de/cms/home/beachtour/erwachsene/turniere.xhtml" target="_blank" rel="noreferrer">
-        Turniere beim BVV finden <ExternalLink aria-hidden="true" />
-      </a>
-      {variant === "v5" ? <span className="expressive-note">Aufschlag → Link → Klarheit</span> : null}
-    </section>
-  );
-}
-
-function LoadingState() {
-  return (
-    <section className="loading-state" aria-live="polite">
-      <span className="loading-ball" aria-hidden="true" />
-      <div><strong>Meldeliste wird ausgewertet</strong><span>Punkte, Rangfolge und Feldgröße werden abgeglichen …</span></div>
-    </section>
-  );
-}
-
-function EstimateResult({ result, shareStatus, copyShareLink }: { result: EstimateResponse; shareStatus: string; copyShareLink: () => void }) {
-  const automatic = result.allTeams.filter((team) => team.status === "automatic").length;
-  const waitlist = result.allTeams.filter((team) => team.status === "waitlist").length;
-
-  return (
-    <div className="results-stack">
-      <section className="result-hero">
-        <div className="result-title">
-          <span className="result-icon"><Trophy aria-hidden="true" /></span>
-          <div><p>{result.tournament.categoryLabel || result.tournament.category}</p><h2>{result.tournament.name}</h2><span><CalendarDays aria-hidden="true" /> {result.tournament.date || "Datum unbekannt"}</span></div>
-        </div>
-        <div className="result-actions">
-          <a href={result.tournament.url} target="_blank" rel="noreferrer" title="Turnier beim BVV öffnen"><ExternalLink aria-hidden="true" /><span>BVV öffnen</span></a>
-          <button type="button" onClick={copyShareLink} title="Link zur Schätzung kopieren"><Share2 aria-hidden="true" /><span>Teilen</span></button>
-          {shareStatus ? <em role="status">{shareStatus}</em> : null}
-        </div>
-      </section>
-
-      <section className="metric-grid" aria-label="Turnierübersicht">
-        <Metric icon={<Users />} label="Meldungen" value={String(result.allTeams.length)} />
-        <Metric icon={<Check />} label="Direkt im Feld" value={String(automatic)} />
-        <Metric icon={<Trophy />} label="Feldgröße" value={String(result.tournament.automaticCapacity)} />
-        <Metric icon={<Sparkles />} label="Warteliste" value={String(waitlist)} />
-      </section>
-
-      <section className="rule-note">
-        <span><CircleHelp aria-hidden="true" /></span>
-        <div><strong>So wurde gerechnet</strong><p>{result.ruleSummary}</p></div>
-        <small>Stand {new Date(result.dataSources.fetchedAt).toLocaleString("de-DE")}</small>
-      </section>
-
-      <section className="team-panel">
-        <div className="team-panel-header"><div><h2>Voraussichtliche Rangliste</h2><p>Sortiert nach der angewendeten Zulassungsregel</p></div><span>{result.allTeams.length} Teams</span></div>
-        <TeamTable teams={result.allTeams} showSourceBucket={shouldShowSourceBucket(result)} />
-      </section>
+    <div className="metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   );
 }
 
-function SubscriptionPanel({
-  email,
-  setEmail,
-  selectedCategories,
-  selectedGender,
-  toggleCategory,
-  setSelectedGender,
-  submitSubscription,
-  loading,
-  status,
-}: {
-  email: string;
-  setEmail: (value: string) => void;
-  selectedCategories: SubscriptionCategory[];
-  selectedGender: SubscriptionGender;
-  toggleCategory: (category: SubscriptionCategory) => void;
-  setSelectedGender: (gender: SubscriptionGender) => void;
-  submitSubscription: (event: FormEvent<HTMLFormElement>) => void;
-  loading: boolean;
-  status: SubscriptionStatus;
-}) {
-  return (
-    <section className="subscribe-workspace">
-      <div className="subscribe-intro"><span><Bell aria-hidden="true" /></span><div><p className="section-kicker">Turnieralarm</p><h1>Neue Turniere, ohne ständig nachzusehen.</h1><p>Wähle Geschlecht und Kategorien. Wir melden uns, sobald etwas Neues online ist.</p></div></div>
-      <form onSubmit={submitSubscription}>
-        <fieldset>
-          <legend>1. Turnierart</legend>
-          <div className="segmented-control">
-            {GENDER_OPTIONS.map((gender) => (
-              <button key={gender.value} type="button" className={selectedGender === gender.value ? "active" : ""} aria-pressed={selectedGender === gender.value} onClick={() => setSelectedGender(gender.value)}>
-                {selectedGender === gender.value ? <Check aria-hidden="true" /> : null}{gender.label}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend>2. Kategorien</legend>
-          <div className="category-chips">
-            {CATEGORY_OPTIONS.map((category) => (
-              <button key={category} type="button" className={selectedCategories.includes(category) ? "active" : ""} aria-pressed={selectedCategories.includes(category)} onClick={() => toggleCategory(category)}>
-                <span>{category}</span>{selectedCategories.includes(category) ? <Check aria-hidden="true" /> : null}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-        <fieldset>
-          <legend>3. Wohin dürfen wir schreiben?</legend>
-          <div className="email-cluster"><Mail aria-hidden="true" /><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@beispiel.de" aria-label="E-Mail-Adresse" /><button type="submit" disabled={loading || !email.trim() || selectedCategories.length === 0}>{loading ? "Speichert …" : "Alarm aktivieren"}<ArrowRight aria-hidden="true" /></button></div>
-        </fieldset>
-      </form>
-      <p className="privacy-note">Nur neue Turniere. Keine Werbung. Jederzeit mit einem Klick abbestellbar.</p>
-      {status ? <Notice kind={status.kind} title={status.message} /> : null}
-    </section>
-  );
-}
-
-function Notice({ kind, title, detail }: { kind: "success" | "error"; title: string; detail?: string }) {
-  return <section className={`notice ${kind}`} role={kind === "error" ? "alert" : "status"}><span>{kind === "error" ? <X /> : <Check />}</span><div><strong>{title}</strong>{detail ? <small>{detail}</small> : null}</div></section>;
-}
-
-function Metric({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-  return <div className="metric"><span>{icon}</span><div><small>{label}</small><strong>{value}</strong></div></div>;
-}
-
 function TeamTable({ teams, showSourceBucket }: { teams: EstimatedTeam[]; showSourceBucket: boolean }) {
-  if (teams.length === 0) return <div className="no-rows">Noch keine Teams in dieser Ansicht.</div>;
+  if (teams.length === 0) {
+    return <div className="no-rows">Keine Teams in dieser Ansicht.</div>;
+  }
 
   return (
     <div className="table-wrap">
       <table>
-        <thead><tr><th>Prognose</th><th>Rang</th><th>Team</th><th>LV</th><th>DVV</th>{showSourceBucket ? <th>Wertung</th> : null}<th>Gemeldet</th></tr></thead>
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Rang</th>
+            <th>Team</th>
+            <th>LV</th>
+            <th>DVV</th>
+            {showSourceBucket ? <th>Wertung</th> : null}
+            <th>Angemeldet</th>
+          </tr>
+        </thead>
         <tbody>
           {teams.map((team) => (
             <tr key={team.id}>
-              <td data-label="Prognose"><span className={`status ${team.status}`}><i />{formatStatus(team.status)}</span></td>
-              <td data-label="Rang"><strong className="rank">{team.predictedRank ?? "–"}</strong></td>
-              <td data-label="Team"><strong>{team.players.length > 0 ? <span className="player-links">{team.players.map((player, index) => <span key={player.userId || `${team.id}-${player.name}`}>{index > 0 ? " / " : ""}{player.userId ? <a href={`https://www.beachvolleybb.de/popup/beach/beachTeamMemberDetails.xhtml?userId=${player.userId}&hideHistoryBackButton=true`} target="_blank" rel="noreferrer">{player.name}</a> : player.name}</span>)}</span> : team.displayName}</strong><span className="club">{team.club}</span></td>
-              <td data-label="LV">{team.lvPoints}</td><td data-label="DVV">{team.dvvPoints}</td>{showSourceBucket ? <td data-label="Wertung">{formatSourceBucket(team.sourceBucket)}</td> : null}<td data-label="Gemeldet">{team.registeredAt || "–"}</td>
+              <td data-label="Status">
+                <span className={`status ${team.status}`}>{formatStatus(team.status)}</span>
+              </td>
+              <td data-label="Rang">{team.predictedRank ?? "-"}</td>
+              <td data-label="Team">
+                <strong>
+                  {team.players.length > 0 ? (
+                    <span className="player-links">
+                      {team.players.map((player, index) => (
+                        <span key={player.userId || `${team.id}-${player.name}`}>
+                          {index > 0 ? " / " : ""}
+                          {player.userId ? (
+                            <a
+                              href={`https://www.beachvolleybb.de/popup/beach/beachTeamMemberDetails.xhtml?userId=${player.userId}&hideHistoryBackButton=true`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              {player.name}
+                            </a>
+                          ) : (
+                            player.name
+                          )}
+                        </span>
+                      ))}
+                    </span>
+                  ) : (
+                    team.displayName
+                  )}
+                </strong>
+                <span>{team.club}</span>
+              </td>
+              <td data-label="LV">{team.lvPoints}</td>
+              <td data-label="DVV">{team.dvvPoints}</td>
+              {showSourceBucket ? <td data-label="Wertung">{formatSourceBucket(team.sourceBucket)}</td> : null}
+              <td data-label="Angemeldet">{team.registeredAt || "-"}</td>
             </tr>
           ))}
         </tbody>
@@ -442,20 +426,22 @@ function shouldShowSourceBucket(result: EstimateResponse): boolean {
 }
 
 function buildBeachvolleyBbTournamentUrl(tournamentId: string): string {
-  const tournamentUrl = new URL(BEACHVOLLEYBB_TOURNAMENT_PATH, "https://www.beachvolleybb.de");
-  tournamentUrl.searchParams.set("BeachTourneyComponent.view", "registrations");
-  tournamentUrl.searchParams.set("BeachTourneyComponent.tourneyId", tournamentId);
-  return tournamentUrl.toString();
+  const url = new URL(BEACHVOLLEYBB_TOURNAMENT_PATH, "https://www.beachvolleybb.de");
+  url.searchParams.set("BeachTourneyComponent.view", "registrations");
+  url.searchParams.set("BeachTourneyComponent.tourneyId", tournamentId);
+  return url.toString();
 }
 
-function buildVersionPath(variant: DesignVariant, tournamentId: string): string {
-  return `/${variant}?id=${encodeURIComponent(tournamentId)}`;
+function buildTournamentAppPath(tournamentId: string): string {
+  return `/tournament?id=${encodeURIComponent(tournamentId)}`;
 }
 
 function extractTournamentId(rawUrl: string): string | null {
   try {
     const parsed = new URL(rawUrl.trim());
-    const id = parsed.searchParams.get("BeachTourneyComponent.tourneyId") || parsed.searchParams.get("id");
+    const beachvolleyId = parsed.searchParams.get("BeachTourneyComponent.tourneyId");
+    const appId = parsed.searchParams.get("id");
+    const id = beachvolleyId || appId;
     return id && /^\d+$/.test(id) ? id : null;
   } catch {
     return null;
@@ -463,29 +449,54 @@ function extractTournamentId(rawUrl: string): string | null {
 }
 
 async function copyToClipboard(value: string): Promise<void> {
-  if (navigator.clipboard) return navigator.clipboard.writeText(value);
+  if (navigator.clipboard) {
+    try {
+      await Promise.race([
+        navigator.clipboard.writeText(value),
+        new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error("Clipboard timeout")), 1200)),
+      ]);
+      return;
+    } catch {
+      // Embedded browsers can expose the API without resolving it. Fall back to the selection-based copy below.
+    }
+  }
+
   const textarea = document.createElement("textarea");
   textarea.value = value;
   textarea.style.position = "fixed";
   textarea.style.left = "-9999px";
   document.body.append(textarea);
   textarea.select();
+
   try {
-    if (!document.execCommand("copy")) throw new Error("Copy command failed.");
+    if (!document.execCommand("copy")) {
+      throw new Error("Copy command failed.");
+    }
   } finally {
     textarea.remove();
   }
 }
 
 function formatStatus(status: EstimatedTeam["status"]): string {
-  if (status === "automatic") return "Im Feld";
-  if (status === "waitlist") return "Warteliste";
-  return "Offen";
+  switch (status) {
+    case "automatic":
+      return "Zugelassen";
+    case "waitlist":
+      return "Warteliste";
+    case "unresolved":
+      return "Ungeklärt";
+  }
 }
 
 function formatSourceBucket(sourceBucket: EstimatedTeam["sourceBucket"]): string {
-  if (sourceBucket === "LV") return "Landesverband";
-  if (sourceBucket === "INVERSE_LV") return "Inverse LV";
-  if (sourceBucket === "UNRESOLVED") return "Ungeklärt";
-  return "DVV";
+  switch (sourceBucket) {
+    case "DVV":
+      return "DVV";
+    case "LV":
+      return "Landesverband";
+    case "INVERSE_LV":
+      return "Inverse LV-Wertung";
+    case "UNRESOLVED":
+      return "Ungeklärt";
+  }
 }

@@ -1,4 +1,4 @@
-import { redirect } from "next/navigation";
+import { EstimatorClient } from "../estimator-client";
 
 export default async function TournamentPage({
   searchParams,
@@ -9,5 +9,5 @@ export default async function TournamentPage({
   const rawId = Array.isArray(params.id) ? params.id[0] : params.id;
   const initialTournamentId = rawId && /^\d+$/.test(rawId) ? rawId : undefined;
 
-  redirect(initialTournamentId ? `/v1?id=${encodeURIComponent(initialTournamentId)}` : "/v1");
+  return <EstimatorClient initialTournamentId={initialTournamentId} />;
 }
