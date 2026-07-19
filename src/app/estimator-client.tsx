@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { Bell, Check, ExternalLink, Search, Share2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { placementPointsFor } from "@/lib/placement-points";
 import type { EstimateResponse, EstimatedTeam, SubscriptionCategory, SubscriptionGender } from "@/lib/types";
 
 type ApiError = {
@@ -260,6 +261,11 @@ export function EstimatorClient({ initialTournamentId }: { initialTournamentId?:
                 </div>
               </section>
 
+              <PlacementPointsPanel
+                category={result.tournament.category}
+                teamCount={result.tournament.mainDrawTeams + result.tournament.qualificationTeams}
+              />
+
               <section
                 className="table-section"
                 aria-label={
@@ -378,6 +384,54 @@ function Metric({ label, value }: { label: string; value: string }) {
   );
 }
 
+function PlacementPointsPanel({
+  category,
+  teamCount,
+}: {
+  category: EstimateResponse["tournament"]["category"];
+  teamCount: number;
+}) {
+  const placements = placementPointsFor(category, teamCount);
+  if (placements.length === 0) return null;
+
+  const hasDvvScoring = placements.some((placement) => placement.dvvPoints != null);
+
+  return (
+    <section className="placement-points" aria-labelledby="placement-points-title">
+      <div className="placement-points-heading">
+        <div>
+          <span className="placement-points-kicker">Turnierwertung</span>
+          <h2 id="placement-points-title">Punkte pro Platz und Spieler</h2>
+        </div>
+        <span className="placement-points-field">Geplantes Feld: {teamCount} Teams</span>
+      </div>
+      <div className="placement-points-track" role="list">
+        {placements.map((placement) => (
+          <article className="placement-point" key={placement.placeLabel} role="listitem">
+            <strong className="placement-point-rank">{placement.placeLabel}</strong>
+            <dl>
+              <div>
+                <dt>DVV</dt>
+                <dd>{placement.dvvPoints ?? "–"}</dd>
+              </div>
+              <div>
+                <dt>LV</dt>
+                <dd>{placement.lvPoints}</dd>
+              </div>
+            </dl>
+          </article>
+        ))}
+      </div>
+      <p className="placement-points-note">
+        {category === "LM" ? "LV-Punkte sind für die Landesmeisterschaft bereits verdoppelt. " : ""}
+        {hasDvvScoring
+          ? "DVV-Punkte setzen mindestens einen Sieg voraus; bei geteilten Plätzen kann der Wert gemittelt werden."
+          : "Diese Kategorie wird ausschließlich für die LV-Rangliste gewertet."}
+      </p>
+    </section>
+  );
+}
+
 function TeamTable({
   teams,
   published,
@@ -462,7 +516,12 @@ function TeamTable({
 }
 
 function shouldShowSourceBucket(result: EstimateResponse): boolean {
-  return result.tournament.category === "Premium" || result.tournament.category === "A+" || result.tournament.category === "A";
+  return (
+    result.tournament.category === "Premium" ||
+    result.tournament.category === "A+" ||
+    result.tournament.category === "A" ||
+    result.tournament.category === "LM"
+  );
 }
 
 function buildBeachvolleyBbTournamentUrl(tournamentId: string): string {

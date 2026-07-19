@@ -120,6 +120,13 @@ export function ruleForCategory(category: TournamentCategory): Rule | null {
         dvvShare: 0.25,
         inverseLv: false,
       };
+    case "LM":
+      return {
+        summary:
+          "Landesmeisterschaft (Kategorie A): 25 % DVV-Rangliste und 75 % LV-Rangliste; die LV-Turnierpunkte zählen doppelt.",
+        dvvShare: 0.25,
+        inverseLv: false,
+      };
     case "B":
       return {
         summary: "B-Turniere: 100 % LV-Rangliste.",

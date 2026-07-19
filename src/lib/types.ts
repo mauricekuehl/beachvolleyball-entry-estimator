@@ -1,5 +1,5 @@
-export type TournamentCategory = "Premium" | "A+" | "A" | "B" | "C" | "Unknown";
-export type SubscriptionCategory = Exclude<TournamentCategory, "Unknown">;
+export type TournamentCategory = "Premium" | "A+" | "A" | "B" | "C" | "LM" | "Unknown";
+export type SubscriptionCategory = Exclude<TournamentCategory, "LM" | "Unknown">;
 export type TournamentGender = "male" | "female" | "mixed" | "unknown";
 export type SubscriptionGender = Exclude<TournamentGender, "unknown">;
 export type RankingSource = "DVV" | "LV";

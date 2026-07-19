@@ -79,6 +79,24 @@ describe("estimateAdmissions", () => {
     ]);
   });
 
+  it("uses category A admission quotas for Landesmeisterschaften", () => {
+    const estimate = estimateAdmissions(tournament("LM", 4), [
+      team("dvv-top", 10, 100),
+      team("lv-top", 90, 1),
+      team("lv-second", 80, 2),
+      team("lv-third", 70, 3),
+      team("outside", 1, 1),
+    ]);
+
+    expect(estimate.automatic.map((entry) => [entry.id, entry.sourceBucket])).toEqual([
+      ["dvv-top", "DVV"],
+      ["lv-top", "LV"],
+      ["lv-second", "LV"],
+      ["lv-third", "LV"],
+    ]);
+    expect(estimate.ruleSummary).toContain("Landesmeisterschaft");
+  });
+
   it("uses inverse LV ranking for C tournaments", () => {
     const estimate = estimateAdmissions(tournament("C", 2), [
       team("high", 100, 0),
