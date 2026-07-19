@@ -383,6 +383,7 @@ export function parsePublishedTournaments(html: string): PublishedTournament[] {
 
 export function parseCategory(label: string): TournamentCategory {
   const normalized = normalizeWhitespace(label).toLowerCase();
+  if (normalized.includes("landesmeister")) return "LM";
   if (normalized.includes("premium")) return "Premium";
   if (normalized.includes("a+")) return "A+";
   if (normalized.includes("kategorie a") || /\ba\b/.test(normalized)) return "A";

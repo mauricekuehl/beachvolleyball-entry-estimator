@@ -3,6 +3,7 @@ import { parseGenderLabel } from "../lib/gender";
 import {
   isAdmissionPublished,
   parseAdmissions,
+  parseCategory,
   parsePublishedTournaments,
   parsePlayerDetails,
   parseRankingRows,
@@ -16,6 +17,10 @@ describe("scraper parsers", () => {
     expect(parseGenderLabel("m")).toBe("male");
     expect(parseGenderLabel("w")).toBe("female");
     expect(parseGenderLabel("Mixed")).toBe("mixed");
+  });
+
+  it("recognizes Landesmeisterschaften as a supported category", () => {
+    expect(parseCategory("BB | Landesmeisterschaften")).toBe("LM");
   });
 
   it("parses tournament metadata from summary and details tables", () => {

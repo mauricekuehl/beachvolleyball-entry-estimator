@@ -146,5 +146,5 @@ async function logNotification(
 }
 
 function isSubscriptionCategory(category: TournamentCategory): category is SubscriptionCategory {
-  return category !== "Unknown";
+  return category !== "Unknown" && category !== "LM";
 }
