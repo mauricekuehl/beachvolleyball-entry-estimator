@@ -218,9 +218,13 @@ function parseRegistrationTime(value: string): number {
 
 function publishedStatus(status: string): EstimatedTeam["status"] {
   const normalized = status.toLowerCase();
-  if (normalized.includes("hauptfeld") || normalized.includes("qualifikation")) return "automatic";
-  if (normalized.includes("nachrück")) return "waitlist";
-  if (normalized.includes("absage") || normalized.includes("abgemeldet")) return "cancelled";
+  // SAMS may answer in German or English, so both label sets are matched.
+  if (normalized.includes("hauptfeld") || normalized.includes("main field")) return "automatic";
+  if (normalized.includes("qualifikation") || normalized.includes("qualification")) return "automatic";
+  if (normalized.includes("nachrück") || normalized.includes("successor")) return "waitlist";
+  if (normalized.includes("absage") || normalized.includes("abgemeldet") || normalized.includes("cancellation")) {
+    return "cancelled";
+  }
   return "unresolved";
 }
 

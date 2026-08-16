@@ -54,6 +54,115 @@ describe("scraper parsers", () => {
     });
   });
 
+  it("parses tournament metadata when SAMS answers with English labels", () => {
+    const summaryHtml = `
+      <table>
+        <tr><td>Tournament: </td><td>Beachfreunde C Cup (m) @ F.L Jahnsportpark</td></tr>
+        <tr><td>Tournament categories: </td><td>BB | Kategorie C</td></tr>
+        <tr><td>Date: </td><td>15.08.2026</td></tr>
+        <tr><td>Sex: </td><td>Male</td></tr>
+        <tr><td>Enrolled teams: </td><td>20</td></tr>
+        <tr><td>Number of teams main tournament: </td><td>16</td></tr>
+        <tr><td>Number of team qualification: </td><td>0</td></tr>
+      </table>`;
+    const detailsHtml = `
+      <table>
+        <tr><td>Number of wildcards main tournament: </td><td>2</td></tr>
+        <tr><td>Admission date:</td><td>11.08.2026</td></tr>
+      </table>`;
+
+    expect(
+      parseTournamentMetadata({
+        id: "123314805",
+        url: "https://www.beachvolleybb.de/example",
+        summaryHtml,
+        detailsHtml,
+      }),
+    ).toMatchObject({
+      name: "Beachfreunde C Cup (m) @ F.L Jahnsportpark",
+      category: "C",
+      gender: "male",
+      registrationCount: 20,
+      mainDrawTeams: 16,
+      wildcardMainDraw: 2,
+      automaticCapacity: 14,
+      admissionDate: "11.08.2026",
+    });
+  });
+
+  it("parses English admission and registration tables", () => {
+    const registrations = parseRegistrations(`
+      <table>
+        <thead><tr><th>#</th><th>Team</th><th>Club</th><th>registered at</th></tr></thead>
+        <tbody><tr>
+          <td>1</td>
+          <td><a href="popup/beach/beachTeamDetails.xhtml?beachTeamId=121713749">B. Belkin / L. Rose</a></td>
+          <td>TSGL Schöneiche</td>
+          <td>23.06.2026, 20:12</td>
+        </tr></tbody>
+      </table>`);
+    expect(registrations).toMatchObject([{ id: "121713749", club: "TSGL Schöneiche" }]);
+
+    const admissions = parseAdmissions(`
+      <table>
+        <thead><tr><th>#</th><th>Team</th><th>Club</th><th>Status</th><th>Double registration</th><th>Points / Admission</th></tr></thead>
+        <tbody><tr>
+          <td>1</td>
+          <td><a href="popup/beach/beachTeamDetails.xhtml?beachTeamId=1">A / B</a></td>
+          <td>Club</td><td>Main field</td><td>-</td><td>LV Männer (Inverse): 0</td>
+        </tr></tbody>
+      </table>`);
+    expect(admissions[0].admission).toMatchObject({
+      rank: 1,
+      status: "Main field",
+      details: "LV Männer (Inverse): 0",
+    });
+  });
+
+  it("parses English player pages", () => {
+    const player = parsePlayerDetails(
+      `
+      <h2>Rose, Luka</h2>
+      <table><tbody><tr><td>DVV license number</td><td>12345</td></tr></tbody></table>
+      <div class="samsContentBox">
+        <div class="samsContentBoxHeader">Ranking list position</div>
+        <div class="samsContentBoxContent">
+          <table><tbody>
+            <tr><td>2026</td><td>BB | Erwachsene Männer</td><td>29.06.2026</td><td>31</td><td>327</td></tr>
+          </tbody></table>
+        </div>
+      </div>`,
+      "male",
+    );
+
+    expect(player.dvvLicense).toBe("12345");
+    expect(player.lvRanking?.points).toBe(327);
+  });
+
+  it("parses the English tournament overview table", () => {
+    const tournaments = parsePublishedTournaments(`
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th><th>Tournament</th><th>Start / Closing date</th>
+            <th>Place</th><th>m./f.</th><th>Teams</th><th>Registration</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>BB | Kategorie C</td>
+            <td><a href="/cms/home/beachtour/erwachsene/turniere.xhtml?BeachTourneyComponent.tourneyId=123314805">Beachfreunde C Cup</a></td>
+            <td>15.08.2026 / 10.08.2026</td>
+            <td>Berlin</td><td>m</td><td>20/16</td><td>closed</td>
+          </tr>
+        </tbody>
+      </table>`);
+
+    expect(tournaments).toMatchObject([
+      { id: "123314805", category: "C", location: "Berlin", gender: "m", registrationState: "closed" },
+    ]);
+  });
+
   it("detects published and unpublished admissions", () => {
     expect(isAdmissionPublished("<p>Die Zulassungsliste für dieses Turnier ist noch nicht veröffentlicht.</p>")).toBe(
       false,

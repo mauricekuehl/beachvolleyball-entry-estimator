@@ -18,6 +18,11 @@ export const TOURNAMENT_OVERVIEW_URL = `${BASE_URL}${TOURNAMENT_PATH}`;
 const USER_AGENT =
   "beachvolleyball-entry-estimator/1.0 (+https://github.com/mauricekuehl/beachvolleyball-entry-estimator)";
 export const EXTERNAL_HTML_CACHE_TTL_MS = 15 * 60 * 1000;
+const ACCEPT_LANGUAGE = "de-DE,de;q=0.9";
+// SAMS renders labels in the visitor's language, but the CDN in front of it caches responses without
+// varying on Accept-Language. A single English visitor can therefore poison the shared cache entry.
+// Requesting an extra query parameter gives us our own cache key, so we reliably get German labels.
+const LOCALE_CACHE_PARAM = "estimatorLang";
 
 type ViewName = "summary" | "details" | "registrations" | "admissions";
 type Fetcher = (url: string) => Promise<string>;
@@ -28,6 +33,32 @@ type CacheEntry = {
 };
 
 const externalHtmlCache = new Map<string, CacheEntry>();
+
+// SAMS labels can arrive in German or English (see LOCALE_CACHE_PARAM), so every lookup accepts both.
+const LABELS = {
+  tournament: ["turnier", "tournament"],
+  category: ["turnierkategorie", "tournament categories"],
+  gender: ["geschlecht", "sex"],
+  date: ["datum", "date"],
+  registrationCount: ["gemeldete mannschaften", "enrolled teams"],
+  mainDrawTeams: ["anzahl teams hauptfeld", "number of teams main tournament"],
+  qualificationTeams: ["anzahl teams qualifikation", "number of team qualification"],
+  wildcards: ["anzahl wildcards hauptfeld", "number of wildcards main tournament"],
+  admissionDate: ["zulassungstermin", "admission date"],
+  dvvLicense: ["dvv-lizenznummer", "dvv license number"],
+  team: ["mannschaft", "team"],
+  club: ["verein", "club"],
+  registeredAt: ["angemeldet am", "registered at"],
+  status: ["status"],
+  doubleRegistration: ["doppelmeldung", "double registration"],
+  admissionDetails: ["punkte", "zulassung", "points", "admission"],
+  overviewCategory: ["kategorie", "category"],
+  overviewLocation: ["ort", "place"],
+  overviewGender: ["m/w", "m./f."],
+  overviewTeams: ["teams"],
+  overviewRegistration: ["anmeldung", "registration"],
+  rankingBox: ["ranglistenplätze", "ranking list position"],
+} as const;
 
 export function parseTournamentUrl(rawUrl: string): { id: string; normalizedUrl: string } {
   let parsed: URL;
@@ -114,9 +145,10 @@ export function parseTournamentMetadata({
 }): TournamentMetadata {
   const summary = parseKeyValueTable(summaryHtml);
   const details = parseKeyValueTable(detailsHtml);
-  const categoryLabel = summary.get("turnierkategorie") ?? details.get("turnierkategorie") ?? "";
-  const mainDrawTeams = parseInteger(summary.get("anzahl teams hauptfeld")) ?? 0;
-  const wildcardMainDraw = parseInteger(details.get("anzahl wildcards hauptfeld")) ?? 0;
+  const categoryLabel =
+    readValue(summary, LABELS.category) ?? readValue(details, LABELS.category) ?? "";
+  const mainDrawTeams = parseInteger(readValue(summary, LABELS.mainDrawTeams)) ?? 0;
+  const wildcardMainDraw = parseInteger(readValue(details, LABELS.wildcards)) ?? 0;
 
   if (!mainDrawTeams) {
     throw new EstimateError("Die Anzahl der Hauptfeldteams konnte nicht ausgelesen werden.", 502, "PARSE_MAIN_DRAW");
@@ -125,17 +157,17 @@ export function parseTournamentMetadata({
   return {
     id,
     url,
-    name: summary.get("turnier") ?? titleFromHtml(summaryHtml) ?? `Turnier ${id}`,
+    name: readValue(summary, LABELS.tournament) ?? titleFromHtml(summaryHtml) ?? `Turnier ${id}`,
     category: parseCategory(categoryLabel),
     categoryLabel,
-    gender: parseGenderLabel(summary.get("geschlecht") ?? ""),
-    date: summary.get("datum") ?? "",
-    registrationCount: parseInteger(summary.get("gemeldete mannschaften")),
+    gender: parseGenderLabel(readValue(summary, LABELS.gender) ?? ""),
+    date: readValue(summary, LABELS.date) ?? "",
+    registrationCount: parseInteger(readValue(summary, LABELS.registrationCount)),
     mainDrawTeams,
-    qualificationTeams: parseInteger(summary.get("anzahl teams qualifikation")) ?? 0,
+    qualificationTeams: parseInteger(readValue(summary, LABELS.qualificationTeams)) ?? 0,
     wildcardMainDraw,
     automaticCapacity: Math.max(0, mainDrawTeams - wildcardMainDraw),
-    admissionDate: details.get("zulassungstermin") ?? "",
+    admissionDate: readValue(details, LABELS.admissionDate) ?? "",
   };
 }
 
@@ -161,9 +193,9 @@ export function parseRegistrations(html: string): RegisteredTeam[] {
       .find("thead th")
       .map((__, th) => normalizeLabel($(th).text()))
       .get();
-    const teamIndex = headers.findIndex((header) => header === "mannschaft");
-    const clubIndex = headers.findIndex((header) => header === "verein");
-    const registeredIndex = headers.findIndex((header) => header === "angemeldet am");
+    const teamIndex = findHeaderIndex(headers, LABELS.team);
+    const clubIndex = findHeaderIndex(headers, LABELS.club);
+    const registeredIndex = findHeaderIndex(headers, LABELS.registeredAt);
     if (teamIndex === -1 || registeredIndex === -1) return;
 
     $(table)
@@ -219,11 +251,11 @@ export function parseAdmissions(html: string): RegisteredTeam[] {
       .map((__, th) => normalizeLabel($(th).text()))
       .get();
     const rankIndex = headers.findIndex((header) => header === "#");
-    const teamIndex = headers.findIndex((header) => header === "mannschaft");
-    const clubIndex = headers.findIndex((header) => header === "verein");
-    const statusIndex = headers.findIndex((header) => header === "status");
-    const doubleRegistrationIndex = headers.findIndex((header) => header.includes("doppelmeldung"));
-    const detailsIndex = headers.findIndex((header) => header.includes("punkte") || header.includes("zulassung"));
+    const teamIndex = findHeaderIndex(headers, LABELS.team);
+    const clubIndex = findHeaderIndex(headers, LABELS.club);
+    const statusIndex = findHeaderIndex(headers, LABELS.status);
+    const doubleRegistrationIndex = findPartialHeaderIndex(headers, LABELS.doubleRegistration);
+    const detailsIndex = findPartialHeaderIndex(headers, LABELS.admissionDetails);
     if (teamIndex === -1 || statusIndex === -1) return;
 
     $(table)
@@ -302,7 +334,7 @@ export function parseRankingRows(html: string): PlayerRanking[] {
   const $ = cheerio.load(html);
   const rankings: PlayerRanking[] = [];
   const rankingTables = $(".samsContentBox")
-    .filter((_, box) => normalizeLabel($(box).find(".samsContentBoxHeader").first().text()) === "ranglistenplätze")
+    .filter((_, box) => isRankingBoxHeader(normalizeLabel($(box).find(".samsContentBoxHeader").first().text())))
     .find("table");
   const tables = rankingTables.length > 0 ? rankingTables : $("table");
 
@@ -341,13 +373,13 @@ export function parsePublishedTournaments(html: string): PublishedTournament[] {
       .find("thead th")
       .map((__, th) => normalizeLabel($(th).text()))
       .get();
-    const categoryIndex = headers.findIndex((header) => header === "kategorie");
-    const tournamentIndex = headers.findIndex((header) => header === "turnier");
+    const categoryIndex = findHeaderIndex(headers, LABELS.overviewCategory);
+    const tournamentIndex = findHeaderIndex(headers, LABELS.tournament);
     const dateIndex = headers.findIndex((header) => header.includes("start"));
-    const locationIndex = headers.findIndex((header) => header === "ort");
-    const genderIndex = headers.findIndex((header) => header === "m/w");
-    const teamsIndex = headers.findIndex((header) => header === "teams");
-    const registrationIndex = headers.findIndex((header) => header === "anmeldung");
+    const locationIndex = findHeaderIndex(headers, LABELS.overviewLocation);
+    const genderIndex = findHeaderIndex(headers, LABELS.overviewGender);
+    const teamsIndex = findHeaderIndex(headers, LABELS.overviewTeams);
+    const registrationIndex = findHeaderIndex(headers, LABELS.overviewRegistration);
     if (categoryIndex === -1 || tournamentIndex === -1) return;
 
     $(table)
@@ -471,10 +503,11 @@ function createCachedFetcher(fetcher: Fetcher): Fetcher {
 }
 
 async function fetchUncachedText(url: string): Promise<string> {
-  const response = await fetch(url, {
+  const response = await fetch(germanLocaleUrl(url), {
     headers: {
       "user-agent": USER_AGENT,
       accept: "text/html,application/xhtml+xml",
+      "accept-language": ACCEPT_LANGUAGE,
     },
     cache: "no-store",
   });
@@ -494,12 +527,12 @@ async function fetchUncachedText(url: string): Promise<string> {
 async function appendPaginatedRankingRows(url: string, html: string, headers: Headers): Promise<string> {
   const $ = cheerio.load(html);
   const rankingBox = $(".samsContentBox").filter(
-    (_, box) => normalizeLabel($(box).find(".samsContentBoxHeader").first().text()) === "ranglistenplätze",
+    (_, box) => isRankingBoxHeader(normalizeLabel($(box).find(".samsContentBoxHeader").first().text())),
   );
   const tableWidget = rankingBox.find(".ui-datatable").first();
   const tableId = tableWidget.attr("id");
   const current = normalizeWhitespace(tableWidget.find(".ui-paginator-current").first().text());
-  const [, pageSizeText, totalText] = current.match(/Daten\s+1-(\d+)\/(\d+)/) ?? [];
+  const [, pageSizeText, totalText] = current.match(/(?:Daten|Data)\s+1-(\d+)\/(\d+)/) ?? [];
   const pageSize = parseInteger(pageSizeText);
   const total = parseInteger(totalText);
   const viewState = $("input[name='jakarta.faces.ViewState']").attr("value");
@@ -551,11 +584,12 @@ async function fetchPrimeFacesDataTablePage(
     "jakarta.faces.ViewState": viewState,
   });
 
-  const response = await fetch(url, {
+  const response = await fetch(germanLocaleUrl(url), {
     method: "POST",
     headers: {
       "user-agent": USER_AGENT,
       accept: "application/xml, text/xml, */*; q=0.01",
+      "accept-language": ACCEPT_LANGUAGE,
       "content-type": "application/x-www-form-urlencoded; charset=UTF-8",
       "faces-request": "partial/ajax",
       "x-requested-with": "XMLHttpRequest",
@@ -572,6 +606,16 @@ async function fetchPrimeFacesDataTablePage(
   return response.text();
 }
 
+function germanLocaleUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    parsed.searchParams.set(LOCALE_CACHE_PARAM, "de");
+    return parsed.toString();
+  } catch {
+    return url;
+  }
+}
+
 function cookieHeaderFrom(headers: Headers): string {
   const getSetCookie = (headers as Headers & { getSetCookie?: () => string[] }).getSetCookie;
   const setCookies = typeof getSetCookie === "function" ? getSetCookie.call(headers) : [headers.get("set-cookie") ?? ""];
@@ -579,6 +623,27 @@ function cookieHeaderFrom(headers: Headers): string {
     .filter(Boolean)
     .map((cookie) => cookie.split(";")[0])
     .join("; ");
+}
+
+function isRankingBoxHeader(header: string): boolean {
+  return (LABELS.rankingBox as readonly string[]).includes(header);
+}
+
+function readValue(values: Map<string, string>, labels: readonly string[]): string | undefined {
+  for (const label of labels) {
+    const value = values.get(label);
+    if (value) return value;
+  }
+
+  return undefined;
+}
+
+function findHeaderIndex(headers: string[], labels: readonly string[]): number {
+  return headers.findIndex((header) => labels.some((label) => header === label));
+}
+
+function findPartialHeaderIndex(headers: string[], labels: readonly string[]): number {
+  return headers.findIndex((header) => labels.some((label) => header.includes(label)));
 }
 
 function parseKeyValueTable(html: string): Map<string, string> {
@@ -663,7 +728,7 @@ function extractDvvLicense($: cheerio.CheerioAPI): string | null {
     const cells = $(row).children("td");
     if (cells.length < 2) return;
     const key = normalizeLabel(cells.eq(0).text());
-    if (key === "dvv-lizenznummer") {
+    if ((LABELS.dvvLicense as readonly string[]).includes(key)) {
       const value = normalizeWhitespace(cells.eq(1).text());
       license = value && value !== "-" ? value : null;
     }

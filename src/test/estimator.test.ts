@@ -154,4 +154,16 @@ describe("estimateAdmissions", () => {
     ]);
     expect(result.cancelled.map((entry) => entry.id)).toEqual(["withdrawn"]);
   });
+
+  it("maps English admission statuses", () => {
+    const published = [
+      { ...team("admitted", 220, 12), admission: { rank: 1, status: "Main field", doubleRegistration: "-", details: "LV Männer (Inverse): 90" } },
+      { ...team("waitlist", 300, 15), admission: { rank: 14, status: "Successor", doubleRegistration: "-", details: "LV Männer: 80" } },
+      { ...team("withdrawn", 400, 20), admission: { rank: null, status: "Cancellation", doubleRegistration: "-", details: "" } },
+    ];
+
+    const result = presentPublishedAdmissions(published);
+
+    expect(result.allTeams.map((entry) => entry.status)).toEqual(["automatic", "waitlist", "cancelled"]);
+  });
 });
